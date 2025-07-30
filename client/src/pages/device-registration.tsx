@@ -27,6 +27,7 @@ import {
   CheckCircle
 } from "lucide-react";
 import { insertDeviceSchema, insertCustomerSchema } from "@shared/schema";
+import { useCurrentLocation } from "@/hooks/useLocation";
 
 const deviceRegistrationSchema = insertDeviceSchema.extend({
   customerName: z.string().min(1, "Customer name is required"),
@@ -53,6 +54,7 @@ export default function DeviceRegistration() {
   const receiptRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { currentLocation } = useCurrentLocation();
 
   const { data: deviceTypes = [] } = useQuery({ queryKey: ["/api/device-types"] });
   const { data: brands = [] } = useQuery({ queryKey: ["/api/brands"] });
@@ -152,6 +154,15 @@ export default function DeviceRegistration() {
   };
 
   const onSubmitDevice = (data: DeviceRegistrationForm) => {
+    if (!currentLocation) {
+      toast({
+        title: "Error",
+        description: "Please select a location first",
+        variant: "destructive",
+      });
+      return;
+    }
+
     let customerId = selectedCustomer?.id;
     
     if (!customerId) {
@@ -166,6 +177,7 @@ export default function DeviceRegistration() {
         onSuccess: (customer) => {
           const deviceData = {
             customerId: customer.id,
+            locationId: currentLocation.id,
             deviceTypeId: data.deviceTypeId,
             brandId: data.brandId,
             modelId: data.modelId,
@@ -184,6 +196,7 @@ export default function DeviceRegistration() {
     } else {
       const deviceData = {
         customerId,
+        locationId: currentLocation.id,
         deviceTypeId: data.deviceTypeId,
         brandId: data.brandId,
         modelId: data.modelId,
@@ -338,8 +351,21 @@ export default function DeviceRegistration() {
   return (
     <div>
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Device Registration</h1>
-        <p className="mt-1 text-sm text-gray-600">Register new devices for repair services with automatic receipt printing</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Device Registration</h1>
+            <p className="mt-1 text-sm text-gray-600">Register new devices for repair services with automatic receipt printing</p>
+          </div>
+          {currentLocation && (
+            <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 rounded-lg">
+              <MapPin className="h-4 w-4 text-blue-600" />
+              <div className="text-sm">
+                <span className="font-medium text-blue-900">{currentLocation.name}</span>
+                <span className="text-blue-700 ml-1">({currentLocation.code})</span>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

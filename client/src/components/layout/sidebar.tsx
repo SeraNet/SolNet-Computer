@@ -8,8 +8,10 @@ import {
   Users,
   Calendar,
   BarChart3,
+  MapPin,
   Settings
 } from "lucide-react";
+import { LocationSelector } from "@/components/LocationSelector";
 
 const navigationItems = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -20,6 +22,7 @@ const navigationItems = [
   { name: "Customers", href: "/customers", icon: Users },
   { name: "Appointments", href: "/appointments", icon: Calendar },
   { name: "Analytics", href: "/analytics", icon: BarChart3 },
+  { name: "Locations", href: "/locations", icon: MapPin },
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 
@@ -39,6 +42,10 @@ export default function Sidebar() {
               <p className="text-sm text-gray-500">Computer Management</p>
             </div>
           </div>
+        </div>
+        
+        <div className="mt-6 px-4">
+          <LocationSelector />
         </div>
         
         <div className="mt-8 flex-grow flex flex-col">

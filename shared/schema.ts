@@ -44,6 +44,27 @@ export const appointmentStatusEnum = pgEnum("appointment_status", [
 
 export const userRoleEnum = pgEnum("user_role", ["admin", "technician", "sales"]);
 
+// Locations table for multi-location support
+export const locations = pgTable("locations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  code: varchar("code", { length: 10 }).notNull().unique(), // Short code like "NYC01", "LA02"
+  address: text("address").notNull(),
+  city: varchar("city").notNull(),
+  state: varchar("state"),
+  zipCode: varchar("zip_code"),
+  country: varchar("country").notNull().default("USA"),
+  phone: varchar("phone"),
+  email: varchar("email"),
+  managerName: varchar("manager_name"),
+  isActive: boolean("is_active").notNull().default(true),
+  timezone: varchar("timezone").default("America/New_York"),
+  businessHours: jsonb("business_hours"), // Store hours as JSON
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Users table
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -53,6 +74,7 @@ export const users = pgTable("users", {
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   role: userRoleEnum("role").notNull().default("sales"),
+  locationId: varchar("location_id").references(() => locations.id),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -108,6 +130,7 @@ export const serviceTypes = pgTable("service_types", {
 export const devices = pgTable("devices", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   customerId: varchar("customer_id").references(() => customers.id).notNull(),
+  locationId: varchar("location_id").references(() => locations.id),
   deviceTypeId: varchar("device_type_id").references(() => deviceTypes.id),
   brandId: varchar("brand_id").references(() => brands.id),
   modelId: varchar("model_id").references(() => models.id),
@@ -131,6 +154,7 @@ export const devices = pgTable("devices", {
 // Inventory items
 export const inventoryItems = pgTable("inventory_items", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  locationId: varchar("location_id").references(() => locations.id),
   name: text("name").notNull(),
   sku: text("sku").notNull().unique(),
   description: text("description"),
@@ -150,6 +174,7 @@ export const inventoryItems = pgTable("inventory_items", {
 export const sales = pgTable("sales", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   customerId: varchar("customer_id").references(() => customers.id),
+  locationId: varchar("location_id").references(() => locations.id),
   totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
   taxAmount: decimal("tax_amount", { precision: 10, scale: 2 }).default("0"),
   discountAmount: decimal("discount_amount", { precision: 10, scale: 2 }).default("0"),
@@ -174,6 +199,7 @@ export const saleItems = pgTable("sale_items", {
 export const appointments = pgTable("appointments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   customerId: varchar("customer_id").references(() => customers.id).notNull(),
+  locationId: varchar("location_id").references(() => locations.id),
   title: text("title").notNull(),
   description: text("description"),
   appointmentDate: timestamp("appointment_date").notNull(),
@@ -198,6 +224,14 @@ export const deviceStatusHistory = pgTable("device_status_history", {
 });
 
 // Relations
+export const locationsRelations = relations(locations, ({ many }) => ({
+  users: many(users),
+  devices: many(devices),
+  inventoryItems: many(inventoryItems),
+  sales: many(sales),
+  appointments: many(appointments),
+}));
+
 export const customersRelations = relations(customers, ({ many }) => ({
   devices: many(devices),
   sales: many(sales),
@@ -208,6 +242,10 @@ export const devicesRelations = relations(devices, ({ one, many }) => ({
   customer: one(customers, {
     fields: [devices.customerId],
     references: [customers.id],
+  }),
+  location: one(locations, {
+    fields: [devices.locationId],
+    references: [locations.id],
   }),
   deviceType: one(deviceTypes, {
     fields: [devices.deviceTypeId],
@@ -292,6 +330,12 @@ export const modelsRelations = relations(models, ({ one, many }) => ({
 }));
 
 // Insert schemas
+export const insertLocationSchema = createInsertSchema(locations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   createdAt: true,
@@ -352,6 +396,9 @@ export const insertServiceTypeSchema = createInsertSchema(serviceTypes).omit({
 });
 
 // Types
+export type Location = typeof locations.$inferSelect;
+export type InsertLocation = z.infer<typeof insertLocationSchema>;
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 

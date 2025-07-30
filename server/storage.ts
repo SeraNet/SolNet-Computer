@@ -11,6 +11,7 @@ import {
   models,
   serviceTypes,
   deviceStatusHistory,
+  locations,
   type User,
   type InsertUser,
   type Customer,
@@ -33,17 +34,27 @@ import {
   type InsertModel,
   type ServiceType,
   type InsertServiceType,
+  type Location,
+  type InsertLocation,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, like, and, gte, lte, count, sql } from "drizzle-orm";
 
 export interface IStorage {
+  // Locations
+  getLocation(id: string): Promise<Location | undefined>;
+  getLocations(): Promise<Location[]>;
+  getActiveLocations(): Promise<Location[]>;
+  createLocation(location: InsertLocation): Promise<Location>;
+  updateLocation(id: string, updates: Partial<InsertLocation>): Promise<Location>;
+
   // Users
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, updates: Partial<InsertUser>): Promise<User>;
   getUsers(): Promise<User[]>;
+  getUsersByLocation(locationId: string): Promise<User[]>;
 
   // Customers
   getCustomer(id: string): Promise<Customer | undefined>;
@@ -55,7 +66,9 @@ export interface IStorage {
   // Devices
   getDevice(id: string): Promise<any>;
   getDevices(): Promise<any[]>;
+  getDevicesByLocation(locationId: string): Promise<any[]>;
   getActiveRepairs(): Promise<any[]>;
+  getActiveRepairsByLocation(locationId: string): Promise<any[]>;
   createDevice(device: InsertDevice): Promise<Device>;
   updateDevice(id: string, updates: Partial<InsertDevice>): Promise<Device>;
   updateDeviceStatus(id: string, status: string, notes?: string, userId?: string): Promise<Device>;
@@ -63,7 +76,9 @@ export interface IStorage {
   // Inventory
   getInventoryItem(id: string): Promise<InventoryItem | undefined>;
   getInventoryItems(): Promise<InventoryItem[]>;
+  getInventoryItemsByLocation(locationId: string): Promise<InventoryItem[]>;
   getLowStockItems(): Promise<InventoryItem[]>;
+  getLowStockItemsByLocation(locationId: string): Promise<InventoryItem[]>;
   createInventoryItem(item: InsertInventoryItem): Promise<InventoryItem>;
   updateInventoryItem(id: string, updates: Partial<InsertInventoryItem>): Promise<InventoryItem>;
   updateInventoryQuantity(id: string, quantity: number): Promise<InventoryItem>;
@@ -71,13 +86,19 @@ export interface IStorage {
   // Sales
   getSale(id: string): Promise<any>;
   getSales(): Promise<any[]>;
+  getSalesByLocation(locationId: string): Promise<any[]>;
   getTodaysSales(): Promise<any[]>;
+  getTodaysSalesByLocation(locationId: string): Promise<any[]>;
   createSale(sale: InsertSale, items: InsertSaleItem[]): Promise<Sale>;
 
   // Appointments
   getAppointment(id: string): Promise<any>;
   getAppointments(): Promise<any[]>;
+  getAppointmentsByLocation(locationId: string): Promise<any[]>;
+  getUpcomingAppointments(): Promise<any[]>;
+  getUpcomingAppointmentsByLocation(locationId: string): Promise<any[]>;
   getTodaysAppointments(): Promise<any[]>;
+  getTodaysAppointmentsByLocation(locationId: string): Promise<any[]>;
   createAppointment(appointment: InsertAppointment): Promise<Appointment>;
   updateAppointment(id: string, updates: Partial<InsertAppointment>): Promise<Appointment>;
 
@@ -96,6 +117,34 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
+  // Locations
+  async getLocation(id: string): Promise<Location | undefined> {
+    const [location] = await db.select().from(locations).where(eq(locations.id, id));
+    return location;
+  }
+
+  async getLocations(): Promise<Location[]> {
+    return await db.select().from(locations).orderBy(asc(locations.name));
+  }
+
+  async getActiveLocations(): Promise<Location[]> {
+    return await db.select().from(locations).where(eq(locations.isActive, true)).orderBy(asc(locations.name));
+  }
+
+  async createLocation(insertLocation: InsertLocation): Promise<Location> {
+    const [location] = await db.insert(locations).values(insertLocation).returning();
+    return location;
+  }
+
+  async updateLocation(id: string, updates: Partial<InsertLocation>): Promise<Location> {
+    const [location] = await db
+      .update(locations)
+      .set({ ...updates, updatedAt: sql`NOW()` })
+      .where(eq(locations.id, id))
+      .returning();
+    return location;
+  }
+
   // Users
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
@@ -123,6 +172,10 @@ export class DatabaseStorage implements IStorage {
 
   async getUsers(): Promise<User[]> {
     return await db.select().from(users).orderBy(asc(users.firstName));
+  }
+
+  async getUsersByLocation(locationId: string): Promise<User[]> {
+    return await db.select().from(users).where(eq(users.locationId, locationId)).orderBy(asc(users.firstName));
   }
 
   // Customers
@@ -225,6 +278,38 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(devices.createdAt));
   }
 
+  async getDevicesByLocation(locationId: string): Promise<any[]> {
+    return await db
+      .select({
+        id: devices.id,
+        customerId: devices.customerId,
+        customerName: customers.name,
+        customerPhone: customers.phone,
+        deviceType: deviceTypes.name,
+        brand: brands.name,
+        model: models.name,
+        serialNumber: devices.serialNumber,
+        problemDescription: devices.problemDescription,
+        serviceType: serviceTypes.name,
+        status: devices.status,
+        priority: devices.priority,
+        estimatedCompletionDate: devices.estimatedCompletionDate,
+        actualCompletionDate: devices.actualCompletionDate,
+        totalCost: devices.totalCost,
+        paymentStatus: devices.paymentStatus,
+        createdAt: devices.createdAt,
+        updatedAt: devices.updatedAt,
+      })
+      .from(devices)
+      .leftJoin(customers, eq(devices.customerId, customers.id))
+      .leftJoin(deviceTypes, eq(devices.deviceTypeId, deviceTypes.id))
+      .leftJoin(brands, eq(devices.brandId, brands.id))
+      .leftJoin(models, eq(devices.modelId, models.id))
+      .leftJoin(serviceTypes, eq(devices.serviceTypeId, serviceTypes.id))
+      .where(eq(devices.locationId, locationId))
+      .orderBy(desc(devices.createdAt));
+  }
+
   async getActiveRepairs(): Promise<any[]> {
     return await db
       .select({
@@ -246,6 +331,34 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(models, eq(devices.modelId, models.id))
       .where(
         sql`${devices.status} NOT IN ('delivered', 'cancelled')`
+      )
+      .orderBy(desc(devices.createdAt));
+  }
+
+  async getActiveRepairsByLocation(locationId: string): Promise<any[]> {
+    return await db
+      .select({
+        id: devices.id,
+        customerId: devices.customerId,
+        customerName: customers.name,
+        customerPhone: customers.phone,
+        deviceType: deviceTypes.name,
+        brand: brands.name,
+        model: models.name,
+        status: devices.status,
+        priority: devices.priority,
+        createdAt: devices.createdAt,
+      })
+      .from(devices)
+      .leftJoin(customers, eq(devices.customerId, customers.id))
+      .leftJoin(deviceTypes, eq(devices.deviceTypeId, deviceTypes.id))
+      .leftJoin(brands, eq(devices.brandId, brands.id))
+      .leftJoin(models, eq(devices.modelId, models.id))
+      .where(
+        and(
+          eq(devices.locationId, locationId),
+          sql`${devices.status} NOT IN ('delivered', 'cancelled')`
+        )
       )
       .orderBy(desc(devices.createdAt));
   }
@@ -332,6 +445,27 @@ export class DatabaseStorage implements IStorage {
     return item;
   }
 
+  async getInventoryItemsByLocation(locationId: string): Promise<InventoryItem[]> {
+    return await db
+      .select()
+      .from(inventoryItems)
+      .where(eq(inventoryItems.locationId, locationId))
+      .orderBy(asc(inventoryItems.name));
+  }
+
+  async getLowStockItemsByLocation(locationId: string): Promise<InventoryItem[]> {
+    return await db
+      .select()
+      .from(inventoryItems)
+      .where(
+        and(
+          eq(inventoryItems.locationId, locationId),
+          sql`${inventoryItems.quantity} <= ${inventoryItems.minStockLevel}`
+        )
+      )
+      .orderBy(asc(inventoryItems.name));
+  }
+
   async updateInventoryQuantity(id: string, quantity: number): Promise<InventoryItem> {
     const [item] = await db
       .update(inventoryItems)
@@ -382,6 +516,25 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(sales.createdAt));
   }
 
+  async getSalesByLocation(locationId: string): Promise<any[]> {
+    return await db
+      .select({
+        id: sales.id,
+        customerId: sales.customerId,
+        customerName: customers.name,
+        totalAmount: sales.totalAmount,
+        paymentMethod: sales.paymentMethod,
+        paymentStatus: sales.paymentStatus,
+        salesPersonName: users.firstName,
+        createdAt: sales.createdAt,
+      })
+      .from(sales)
+      .leftJoin(customers, eq(sales.customerId, customers.id))
+      .leftJoin(users, eq(sales.salesPersonId, users.id))
+      .where(eq(sales.locationId, locationId))
+      .orderBy(desc(sales.createdAt));
+  }
+
   async getTodaysSales(): Promise<any[]> {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -397,6 +550,29 @@ export class DatabaseStorage implements IStorage {
       .from(sales)
       .leftJoin(customers, eq(sales.customerId, customers.id))
       .where(gte(sales.createdAt, today))
+      .orderBy(desc(sales.createdAt));
+  }
+
+  async getTodaysSalesByLocation(locationId: string): Promise<any[]> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    return await db
+      .select({
+        id: sales.id,
+        customerName: customers.name,
+        totalAmount: sales.totalAmount,
+        paymentMethod: sales.paymentMethod,
+        createdAt: sales.createdAt,
+      })
+      .from(sales)
+      .leftJoin(customers, eq(sales.customerId, customers.id))
+      .where(
+        and(
+          eq(sales.locationId, locationId),
+          gte(sales.createdAt, today)
+        )
+      )
       .orderBy(desc(sales.createdAt));
   }
 
@@ -470,6 +646,66 @@ export class DatabaseStorage implements IStorage {
       .orderBy(asc(appointments.appointmentDate));
   }
 
+  async getAppointmentsByLocation(locationId: string): Promise<any[]> {
+    return await db
+      .select({
+        id: appointments.id,
+        customerId: appointments.customerId,
+        customerName: customers.name,
+        customerPhone: customers.phone,
+        title: appointments.title,
+        appointmentDate: appointments.appointmentDate,
+        duration: appointments.duration,
+        status: appointments.status,
+        assignedToName: users.firstName,
+        createdAt: appointments.createdAt,
+      })
+      .from(appointments)
+      .leftJoin(customers, eq(appointments.customerId, customers.id))
+      .leftJoin(users, eq(appointments.assignedTo, users.id))
+      .where(eq(appointments.locationId, locationId))
+      .orderBy(asc(appointments.appointmentDate));
+  }
+
+  async getUpcomingAppointments(): Promise<any[]> {
+    const now = new Date();
+    
+    return await db
+      .select({
+        id: appointments.id,
+        customerName: customers.name,
+        title: appointments.title,
+        appointmentDate: appointments.appointmentDate,
+        status: appointments.status,
+      })
+      .from(appointments)
+      .leftJoin(customers, eq(appointments.customerId, customers.id))
+      .where(gte(appointments.appointmentDate, now))
+      .orderBy(asc(appointments.appointmentDate));
+  }
+
+  async getUpcomingAppointmentsByLocation(locationId: string): Promise<any[]> {
+    const now = new Date();
+    
+    return await db
+      .select({
+        id: appointments.id,
+        customerName: customers.name,
+        title: appointments.title,
+        appointmentDate: appointments.appointmentDate,
+        status: appointments.status,
+      })
+      .from(appointments)
+      .leftJoin(customers, eq(appointments.customerId, customers.id))
+      .where(
+        and(
+          eq(appointments.locationId, locationId),
+          gte(appointments.appointmentDate, now)
+        )
+      )
+      .orderBy(asc(appointments.appointmentDate));
+  }
+
   async getTodaysAppointments(): Promise<any[]> {
     const today = new Date();
     const tomorrow = new Date(today);
@@ -487,6 +723,31 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(customers, eq(appointments.customerId, customers.id))
       .where(
         and(
+          gte(appointments.appointmentDate, today),
+          lte(appointments.appointmentDate, tomorrow)
+        )
+      )
+      .orderBy(asc(appointments.appointmentDate));
+  }
+
+  async getTodaysAppointmentsByLocation(locationId: string): Promise<any[]> {
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    return await db
+      .select({
+        id: appointments.id,
+        customerName: customers.name,
+        title: appointments.title,
+        appointmentDate: appointments.appointmentDate,
+        status: appointments.status,
+      })
+      .from(appointments)
+      .leftJoin(customers, eq(appointments.customerId, customers.id))
+      .where(
+        and(
+          eq(appointments.locationId, locationId),
           gte(appointments.appointmentDate, today),
           lte(appointments.appointmentDate, tomorrow)
         )
