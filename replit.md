@@ -49,14 +49,16 @@ The application follows a full-stack monorepo structure with clear separation be
 7. **Appointments**: Scheduling system for customer interactions
 
 ### Application Features
-- **Dashboard**: Business metrics and quick actions
-- **Device Registration**: New device intake and problem assessment
+- **Dashboard**: Business metrics and quick actions with device registration and receipt printing
+- **Device Registration**: New device intake with automatic receipt printing
 - **Repair Tracking**: Status monitoring through repair stages
-- **Point of Sale**: Transaction processing with inventory integration
-- **Inventory Management**: Stock levels and product catalog
+- **Point of Sale**: Transaction processing with shopping cart and inventory integration
+- **Inventory Management**: Stock levels, product catalog with item registration forms
+- **Service Management**: Device types, brands, models, and service types configuration
 - **Customer Management**: Contact information and service history
 - **Appointment Scheduling**: Calendar and booking system
 - **Analytics**: Business reporting and metrics
+- **Settings**: Comprehensive business configuration, notifications, system preferences, and receipt customization
 
 ### UI/UX Design
 - **Design System**: Consistent component library with variants
