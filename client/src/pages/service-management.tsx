@@ -742,7 +742,7 @@ export default function ServiceManagement() {
             Models
           </TabsTrigger>
           <TabsTrigger value="service-types" className="flex items-center gap-2">
-            <Tool className="h-4 w-4" />
+            <Wrench className="h-4 w-4" />
             Service Types
           </TabsTrigger>
         </TabsList>
