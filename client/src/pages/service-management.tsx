@@ -1246,9 +1246,9 @@ function ModelsTab() {
   };
 
   const filteredItems = models.filter((item) =>
-    item.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.brand?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.deviceType?.name?.toLowerCase().includes(searchTerm.toLowerCase())
+    item.models?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.brands?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.device_types?.name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   if (modelsLoading) {
@@ -1454,38 +1454,38 @@ function ModelsTab() {
                 </TableRow>
               ) : (
                 filteredItems.map((item) => (
-                  <TableRow key={item.id}>
+                  <TableRow key={item.models?.id}>
                     <TableCell>
                       <div>
-                        <div className="font-medium">{item.name}</div>
-                        {item.description && (
-                          <div className="text-sm text-gray-600 truncate max-w-xs">{item.description}</div>
+                        <div className="font-medium">{item.models?.name}</div>
+                        {item.models?.description && (
+                          <div className="text-sm text-gray-600 truncate max-w-xs">{item.models?.description}</div>
                         )}
                       </div>
                     </TableCell>
                     <TableCell>
-                      <span className="font-medium">{item.brand?.name || "Unknown"}</span>
+                      <span className="font-medium">{item.brands?.name || "Unknown"}</span>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">{item.deviceType?.name || "Unknown"}</Badge>
+                      <Badge variant="outline">{item.device_types?.name || "Unknown"}</Badge>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
                         <Calendar className="h-3 w-3 text-gray-400" />
-                        <span className="text-sm">{item.releaseYear || "N/A"}</span>
+                        <span className="text-sm">{item.models?.releaseYear || "N/A"}</span>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={item.isActive ? "default" : "secondary"}>
-                        {item.isActive ? "Active" : "Inactive"}
+                      <Badge variant={item.models?.isActive ? "default" : "secondary"}>
+                        {item.models?.isActive ? "Active" : "Inactive"}
                       </Badge>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <Button variant="ghost" size="sm" onClick={() => handleEdit(item)}>
+                        <Button variant="ghost" size="sm" onClick={() => handleEdit(item.models)}>
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => handleDelete(item)}>
+                        <Button variant="ghost" size="sm" onClick={() => handleDelete(item.models)}>
                           <Trash2 className="h-4 w-4 text-red-600" />
                         </Button>
                       </div>
