@@ -373,6 +373,7 @@ export const insertSaleSchema = createInsertSchema(sales).omit({
 
 export const insertSaleItemSchema = createInsertSchema(saleItems).omit({
   id: true,
+  saleId: true, // saleId is added by the backend during creation
 });
 
 export const insertAppointmentSchema = createInsertSchema(appointments).omit({

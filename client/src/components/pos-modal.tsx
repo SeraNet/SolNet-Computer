@@ -80,12 +80,16 @@ export default function POSModal({ open, onOpenChange }: POSModalProps) {
     },
   });
 
-  const filteredItems = Array.isArray(inventoryItems) ? inventoryItems.filter((item: any) =>
-    item.quantity > 0 && (
+  const filteredItems = Array.isArray(inventoryItems) ? inventoryItems.filter((item: any) => {
+    // Calculate remaining stock after cart items
+    const cartItem = cart.find(cartItem => cartItem.id === item.id);
+    const remainingStock = item.quantity - (cartItem ? cartItem.quantity : 0);
+    
+    return remainingStock > 0 && (
       item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.sku.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-  ) : [];
+    );
+  }) : [];
 
   const addToCart = (item: any) => {
     const existingItem = cart.find(cartItem => cartItem.id === item.id);
