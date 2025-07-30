@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ShoppingCart, Plus, Minus, Trash2, CreditCard } from "lucide-react";
@@ -40,19 +40,23 @@ export default function POSModal({ open, onOpenChange }: POSModalProps) {
       const saleItems = cart.map(item => ({
         inventoryItemId: item.id,
         quantity: item.quantity,
-        unitPrice: item.price,
-        totalPrice: item.price * item.quantity,
+        unitPrice: parseFloat(String(item.price || "0")),
+        totalPrice: parseFloat(String(item.price || "0")) * item.quantity,
       }));
 
       const response = await apiRequest("POST", "/api/sales", {
         sale: {
-          totalAmount,
-          taxAmount: 0,
-          discountAmount: 0,
+          totalAmount: totalAmount.toString(),
+          taxAmount: "0",
+          discountAmount: "0",
           paymentMethod: "cash",
           paymentStatus: "paid",
         },
-        items: saleItems,
+        items: saleItems.map(item => ({
+          ...item,
+          unitPrice: item.unitPrice.toString(),
+          totalPrice: item.totalPrice.toString(),
+        })),
       });
       return response.json();
     },
@@ -77,8 +81,10 @@ export default function POSModal({ open, onOpenChange }: POSModalProps) {
   });
 
   const filteredItems = Array.isArray(inventoryItems) ? inventoryItems.filter((item: any) =>
-    item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.sku.toLowerCase().includes(searchTerm.toLowerCase())
+    item.quantity > 0 && (
+      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.sku.toLowerCase().includes(searchTerm.toLowerCase())
+    )
   ) : [];
 
   const addToCart = (item: any) => {
@@ -146,7 +152,7 @@ export default function POSModal({ open, onOpenChange }: POSModalProps) {
     setCart([]);
   };
 
-  const cartTotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const cartTotal = cart.reduce((sum, item) => sum + (parseFloat(String(item.price || "0")) * item.quantity), 0);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -208,7 +214,15 @@ export default function POSModal({ open, onOpenChange }: POSModalProps) {
             </div>
             
             <Card className="flex-1 flex flex-col">
-              <CardContent className="p-4 flex-1 flex flex-col">
+              <CardHeader className="pb-3">
+                <div className="grid grid-cols-4 gap-2 text-xs font-medium text-gray-500 border-b pb-2">
+                  <div>Item</div>
+                  <div className="text-center">Qty</div>
+                  <div className="text-right">Price</div>
+                  <div className="text-right">Total</div>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0 flex-1 flex flex-col">
                 {cart.length === 0 ? (
                   <div className="flex-1 flex items-center justify-center text-gray-500">
                     <div className="text-center">
@@ -217,19 +231,20 @@ export default function POSModal({ open, onOpenChange }: POSModalProps) {
                     </div>
                   </div>
                 ) : (
-                  <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3">
+                  <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2">
                     {cart.map((item) => (
-                      <div key={item.id} className="flex items-center justify-between py-2 border-b border-gray-100">
-                        <div className="flex-1">
-                          <div className="font-medium text-sm">{item.name}</div>
-                          <div className="text-sm text-gray-500">
+                      <div key={item.id} className="grid grid-cols-4 gap-2 items-center py-2 border-b border-gray-100">
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-sm truncate">{item.name}</div>
+                          <div className="text-xs text-gray-500">
                             ${parseFloat(String(item.price || "0")).toFixed(2)} each
                           </div>
                         </div>
-                        <div className="flex items-center space-x-2">
+                        <div className="flex items-center justify-center space-x-1">
                           <Button
                             size="sm"
                             variant="outline"
+                            className="h-6 w-6 p-0"
                             onClick={() => updateQuantity(item.id, item.quantity - 1)}
                           >
                             <Minus className="h-3 w-3" />
@@ -238,16 +253,23 @@ export default function POSModal({ open, onOpenChange }: POSModalProps) {
                           <Button
                             size="sm"
                             variant="outline"
+                            className="h-6 w-6 p-0"
                             onClick={() => updateQuantity(item.id, item.quantity + 1)}
                           >
                             <Plus className="h-3 w-3" />
                           </Button>
-                          <span className="text-sm font-medium w-16 text-right">
+                        </div>
+                        <div className="text-sm text-right">
+                          ${parseFloat(String(item.price || "0")).toFixed(2)}
+                        </div>
+                        <div className="flex items-center justify-end space-x-2">
+                          <span className="text-sm font-medium">
                             ${(parseFloat(String(item.price || "0")) * item.quantity).toFixed(2)}
                           </span>
                           <Button
                             size="sm"
                             variant="ghost"
+                            className="h-6 w-6 p-0"
                             onClick={() => removeFromCart(item.id)}
                           >
                             <Trash2 className="h-3 w-3 text-red-500" />
