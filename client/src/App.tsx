@@ -10,6 +10,7 @@ import RepairTracking from "@/pages/repair-tracking";
 import PointOfSale from "@/pages/point-of-sale";
 import Inventory from "@/pages/inventory-complete";
 import InventoryManagement from "@/pages/inventory-management";
+import InventoryPredictions from "@/pages/inventory-predictions";
 import Customers from "@/pages/customers";
 import Appointments from "@/pages/appointments";
 import Analytics from "@/pages/analytics";
@@ -29,6 +30,7 @@ function Router() {
         <Route path="/point-of-sale" component={PointOfSale} />
         <Route path="/inventory" component={Inventory} />
         <Route path="/inventory-management" component={InventoryManagement} />
+        <Route path="/inventory-predictions" component={InventoryPredictions} />
         <Route path="/customers" component={Customers} />
         <Route path="/appointments" component={Appointments} />
         <Route path="/analytics" component={Analytics} />

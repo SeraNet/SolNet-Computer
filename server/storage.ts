@@ -431,6 +431,158 @@ export class DatabaseStorage implements IStorage {
       .orderBy(asc(inventoryItems.name));
   }
 
+  // Smart inventory prediction methods
+  async updateInventoryPredictions(): Promise<void> {
+    const items = await this.getInventoryItems();
+    
+    for (const item of items) {
+      const salesData = await this.getItemSalesHistory(item.id, 30); // Last 30 days
+      const avgDailySales = this.calculateAverageDailySales(salesData);
+      
+      const predictions = this.calculateStockPredictions(item, avgDailySales);
+      
+      await db
+        .update(inventoryItems)
+        .set({
+          avgDailySales: avgDailySales.toString(),
+          predictedStockout: predictions.predictedStockout,
+          updatedAt: sql`NOW()`,
+        })
+        .where(eq(inventoryItems.id, item.id));
+    }
+  }
+
+  async getInventoryPredictions(): Promise<any[]> {
+    const items = await db
+      .select()
+      .from(inventoryItems)
+      .where(eq(inventoryItems.isActive, true));
+
+    return items.map(item => {
+      const avgDailySales = parseFloat(item.avgDailySales || "0");
+      const daysUntilStockout = avgDailySales > 0 ? Math.floor(item.quantity / avgDailySales) : -1;
+      
+      return {
+        itemId: item.id,
+        itemName: item.name,
+        sku: item.sku,
+        currentStock: item.quantity,
+        minStockLevel: item.minStockLevel,
+        reorderPoint: item.reorderPoint,
+        predictedStockout: item.predictedStockout,
+        daysUntilStockout,
+        suggestedReorderQuantity: item.reorderQuantity,
+        avgDailySales,
+        riskLevel: this.calculateRiskLevel(item.quantity, item.minStockLevel, daysUntilStockout),
+        category: item.category,
+        supplier: item.supplier,
+        leadTimeDays: item.leadTimeDays,
+      };
+    });
+  }
+
+  async getStockAlerts(): Promise<any[]> {
+    const predictions = await this.getInventoryPredictions();
+    const alerts: any[] = [];
+
+    predictions.forEach(prediction => {
+      // Low stock alert
+      if (prediction.currentStock <= prediction.minStockLevel) {
+        alerts.push({
+          id: `low_stock_${prediction.itemId}`,
+          itemId: prediction.itemId,
+          itemName: prediction.itemName,
+          alertType: 'low_stock',
+          message: `${prediction.itemName} is below minimum stock level (${prediction.currentStock}/${prediction.minStockLevel})`,
+          priority: prediction.currentStock === 0 ? 'critical' : 'high',
+          createdAt: new Date(),
+          acknowledged: false,
+        });
+      }
+
+      // Predicted stockout alert
+      if (prediction.daysUntilStockout > 0 && prediction.daysUntilStockout <= 7) {
+        alerts.push({
+          id: `stockout_${prediction.itemId}`,
+          itemId: prediction.itemId,
+          itemName: prediction.itemName,
+          alertType: 'predicted_stockout',
+          message: `${prediction.itemName} predicted to run out in ${prediction.daysUntilStockout} days`,
+          priority: prediction.daysUntilStockout <= 3 ? 'critical' : 'high',
+          createdAt: new Date(),
+          acknowledged: false,
+        });
+      }
+
+      // Reorder required alert
+      if (prediction.currentStock <= prediction.reorderPoint) {
+        alerts.push({
+          id: `reorder_${prediction.itemId}`,
+          itemId: prediction.itemId,
+          itemName: prediction.itemName,
+          alertType: 'reorder_required',
+          message: `${prediction.itemName} has reached reorder point. Suggested quantity: ${prediction.suggestedReorderQuantity}`,
+          priority: 'medium',
+          createdAt: new Date(),
+          acknowledged: false,
+        });
+      }
+    });
+
+    return alerts.sort((a, b) => {
+      const priorityOrder = { critical: 4, high: 3, medium: 2, low: 1 };
+      return (priorityOrder[b.priority as keyof typeof priorityOrder] || 0) - 
+             (priorityOrder[a.priority as keyof typeof priorityOrder] || 0);
+    });
+  }
+
+  private async getItemSalesHistory(itemId: string, days: number): Promise<any[]> {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - days);
+
+    return await db
+      .select({
+        quantity: saleItems.quantity,
+        date: sales.createdAt,
+      })
+      .from(saleItems)
+      .innerJoin(sales, eq(saleItems.saleId, sales.id))
+      .where(and(
+        eq(saleItems.inventoryItemId, itemId),
+        sql`${sales.createdAt} >= ${cutoffDate.toISOString()}`
+      ))
+      .orderBy(sales.createdAt);
+  }
+
+  private calculateAverageDailySales(salesData: any[]): number {
+    if (salesData.length === 0) return 0;
+
+    const totalQuantity = salesData.reduce((sum, sale) => sum + sale.quantity, 0);
+    const days = 30; // Fixed 30-day period for consistency
+    return totalQuantity / days;
+  }
+
+  private calculateStockPredictions(item: InventoryItem, avgDailySales: number): any {
+    if (avgDailySales <= 0) {
+      return { predictedStockout: null };
+    }
+
+    const daysUntilStockout = item.quantity / avgDailySales;
+    const predictedStockout = new Date();
+    predictedStockout.setDate(predictedStockout.getDate() + Math.floor(daysUntilStockout));
+
+    return {
+      predictedStockout: predictedStockout.toISOString(),
+    };
+  }
+
+  private calculateRiskLevel(currentStock: number, minStock: number, daysUntilStockout: number): string {
+    if (currentStock === 0) return 'critical';
+    if (currentStock <= minStock || (daysUntilStockout > 0 && daysUntilStockout <= 3)) return 'high';
+    if (daysUntilStockout > 0 && daysUntilStockout <= 7) return 'medium';
+    return 'low';
+  }
+
   async createInventoryItem(insertItem: InsertInventoryItem): Promise<InventoryItem> {
     const [item] = await db.insert(inventoryItems).values(insertItem).returning();
     return item;
@@ -477,15 +629,6 @@ export class DatabaseStorage implements IStorage {
         )
       )
       .orderBy(asc(inventoryItems.name));
-  }
-
-  async updateInventoryQuantity(id: string, quantity: number): Promise<InventoryItem> {
-    const [item] = await db
-      .update(inventoryItems)
-      .set({ quantity, updatedAt: sql`NOW()` })
-      .where(eq(inventoryItems.id, id))
-      .returning();
-    return item;
   }
 
   // Sales

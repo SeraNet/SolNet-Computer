@@ -245,6 +245,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Smart inventory prediction endpoints
+  app.get("/api/inventory/predictions", async (req, res) => {
+    try {
+      const predictions = await storage.getInventoryPredictions();
+      res.json(predictions);
+    } catch (error) {
+      console.error("Error fetching inventory predictions:", error);
+      res.status(500).json({ message: "Failed to fetch inventory predictions" });
+    }
+  });
+
+  app.get("/api/inventory/alerts", async (req, res) => {
+    try {
+      const alerts = await storage.getStockAlerts();
+      res.json(alerts);
+    } catch (error) {
+      console.error("Error fetching stock alerts:", error);
+      res.status(500).json({ message: "Failed to fetch stock alerts" });
+    }
+  });
+
+  app.post("/api/inventory/update-predictions", async (req, res) => {
+    try {
+      await storage.updateInventoryPredictions();
+      res.json({ message: "Inventory predictions updated successfully" });
+    } catch (error) {
+      console.error("Error updating inventory predictions:", error);
+      res.status(500).json({ message: "Failed to update inventory predictions" });
+    }
+  });
+
   app.get("/api/inventory/:id", async (req, res) => {
     try {
       const item = await storage.getInventoryItem(req.params.id);

@@ -163,9 +163,15 @@ export const inventoryItems = pgTable("inventory_items", {
   salePrice: decimal("sale_price", { precision: 10, scale: 2 }).notNull(),
   quantity: integer("quantity").notNull().default(0),
   minStockLevel: integer("min_stock_level").notNull().default(10),
+  reorderPoint: integer("reorder_point").notNull().default(15),
+  reorderQuantity: integer("reorder_quantity").notNull().default(50),
+  leadTimeDays: integer("lead_time_days").default(7),
+  avgDailySales: decimal("avg_daily_sales", { precision: 8, scale: 2 }).default("0"),
   supplier: text("supplier"),
   barcode: text("barcode"),
   isActive: boolean("is_active").notNull().default(true),
+  lastRestocked: timestamp("last_restocked"),
+  predictedStockout: timestamp("predicted_stockout"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -431,3 +437,25 @@ export type InsertModel = z.infer<typeof insertModelSchema>;
 
 export type ServiceType = typeof serviceTypes.$inferSelect;
 export type InsertServiceType = z.infer<typeof insertServiceTypeSchema>;
+
+// Smart inventory prediction types
+export type InventoryPrediction = {
+  itemId: string;
+  currentStock: number;
+  predictedStockout: Date | null;
+  daysUntilStockout: number;
+  suggestedReorderQuantity: number;
+  avgDailySales: number;
+  riskLevel: 'low' | 'medium' | 'high' | 'critical';
+};
+
+export type StockAlert = {
+  id: string;
+  itemId: string;
+  itemName: string;
+  alertType: 'low_stock' | 'predicted_stockout' | 'reorder_required';
+  message: string;
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  createdAt: Date;
+  acknowledged: boolean;
+};

@@ -9,7 +9,8 @@ import {
   Calendar,
   BarChart3,
   MapPin,
-  Settings
+  Settings,
+  TrendingUp
 } from "lucide-react";
 import { LocationSelector } from "@/components/LocationSelector";
 
@@ -19,6 +20,7 @@ const navigationItems = [
   { name: "Repair Tracking", href: "/repair-tracking", icon: Wrench },
   { name: "Point of Sale", href: "/point-of-sale", icon: ShoppingCart },
   { name: "Inventory", href: "/inventory", icon: Package },
+  { name: "Smart Predictions", href: "/inventory-predictions", icon: TrendingUp },
   { name: "Customers", href: "/customers", icon: Users },
   { name: "Appointments", href: "/appointments", icon: Calendar },
   { name: "Analytics", href: "/analytics", icon: BarChart3 },
