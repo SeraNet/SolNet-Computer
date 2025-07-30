@@ -508,6 +508,170 @@ export class DatabaseStorage implements IStorage {
     return appointment;
   }
 
+  async getCustomerDevices(customerId: string): Promise<any[]> {
+    return await db
+      .select({
+        id: devices.id,
+        deviceType: deviceTypes.name,
+        brand: brands.name,
+        model: models.name,
+        serialNumber: devices.serialNumber,
+        status: devices.status,
+        createdAt: devices.createdAt,
+      })
+      .from(devices)
+      .leftJoin(deviceTypes, eq(devices.deviceTypeId, deviceTypes.id))
+      .leftJoin(brands, eq(devices.brandId, brands.id))
+      .leftJoin(models, eq(devices.modelId, models.id))
+      .where(eq(devices.customerId, customerId))
+      .orderBy(desc(devices.createdAt));
+  }
+
+  // Analytics methods
+  async getAnalytics(query: any): Promise<any> {
+    const dateRange = parseInt(query.dateRange) || 30;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - dateRange);
+
+    // Get total revenue
+    const revenueResult = await db
+      .select({ total: sql`COALESCE(SUM(${sales.totalAmount}), 0)` })
+      .from(sales)
+      .where(sql`${sales.createdAt} >= ${startDate}`);
+
+    // Get active repairs count
+    const activeRepairsResult = await db
+      .select({ count: sql`COUNT(*)` })
+      .from(devices)
+      .where(sql`${devices.status} NOT IN ('delivered', 'cancelled')`);
+
+    // Get total sales count
+    const salesCountResult = await db
+      .select({ count: sql`COUNT(*)` })
+      .from(sales)
+      .where(sql`${sales.createdAt} >= ${startDate}`);
+
+    // Get new customers count
+    const newCustomersResult = await db
+      .select({ count: sql`COUNT(*)` })
+      .from(customers)
+      .where(sql`${customers.createdAt} >= ${startDate}`);
+
+    // Get completion rate
+    const completionRateResult = await db
+      .select({ 
+        total: sql`COUNT(*)`,
+        completed: sql`COUNT(CASE WHEN ${devices.status} IN ('completed', 'delivered') THEN 1 END)`
+      })
+      .from(devices)
+      .where(sql`${devices.createdAt} >= ${startDate}`);
+
+    // Get average repair time
+    const avgRepairTimeResult = await db
+      .select({ 
+        avgTime: sql`AVG(EXTRACT(EPOCH FROM (${devices.actualCompletionDate} - ${devices.createdAt})) / 86400)`
+      })
+      .from(devices)
+      .where(sql`${devices.actualCompletionDate} IS NOT NULL AND ${devices.createdAt} >= ${startDate}`);
+
+    // Get today's appointments
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+
+    const appointmentsTodayResult = await db
+      .select({ count: sql`COUNT(*)` })
+      .from(appointments)
+      .where(sql`${appointments.appointmentDate} = ${todayStart.toISOString().split('T')[0]}`);
+
+    // Get average transaction
+    const avgTransactionResult = await db
+      .select({ avg: sql`COALESCE(AVG(${sales.totalAmount}), 0)` })
+      .from(sales)
+      .where(sql`${sales.createdAt} >= ${startDate}`);
+
+    const completionRate = completionRateResult[0]?.total > 0 
+      ? ((completionRateResult[0]?.completed || 0) / completionRateResult[0]?.total * 100).toFixed(1)
+      : 0;
+
+    return {
+      totalRevenue: parseFloat(revenueResult[0]?.total || 0),
+      activeRepairs: parseInt(activeRepairsResult[0]?.count || 0),
+      totalSales: parseInt(salesCountResult[0]?.count || 0),
+      newCustomers: parseInt(newCustomersResult[0]?.count || 0),
+      completionRate: parseFloat(completionRate),
+      avgRepairTime: parseFloat(avgRepairTimeResult[0]?.avgTime || 0),
+      appointmentsToday: parseInt(appointmentsTodayResult[0]?.count || 0),
+      avgTransaction: parseFloat(avgTransactionResult[0]?.avg || 0),
+    };
+  }
+
+  async getSalesAnalytics(query: any): Promise<any[]> {
+    const dateRange = parseInt(query.dateRange) || 30;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - dateRange);
+
+    return await db
+      .select({
+        date: sql`DATE(${sales.createdAt})`,
+        total: sql`SUM(${sales.totalAmount})`,
+        count: sql`COUNT(*)`
+      })
+      .from(sales)
+      .where(sql`${sales.createdAt} >= ${startDate}`)
+      .groupBy(sql`DATE(${sales.createdAt})`)
+      .orderBy(sql`DATE(${sales.createdAt})`);
+  }
+
+  async getRepairAnalytics(query: any): Promise<any[]> {
+    return await db
+      .select({
+        status: devices.status,
+        count: sql`COUNT(*)`
+      })
+      .from(devices)
+      .groupBy(devices.status)
+      .orderBy(sql`COUNT(*) DESC`);
+  }
+
+  async getTopSellingItems(query: any): Promise<any[]> {
+    const dateRange = parseInt(query.dateRange) || 30;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - dateRange);
+
+    return await db
+      .select({
+        name: inventoryItems.name,
+        quantity: sql`SUM(${saleItems.quantity})`,
+        revenue: sql`SUM(${saleItems.quantity} * ${saleItems.unitPrice})`
+      })
+      .from(saleItems)
+      .leftJoin(sales, eq(saleItems.saleId, sales.id))
+      .leftJoin(inventoryItems, eq(saleItems.inventoryItemId, inventoryItems.id))
+      .where(sql`${sales.createdAt} >= ${startDate}`)
+      .groupBy(inventoryItems.name)
+      .orderBy(sql`SUM(${saleItems.quantity} * ${saleItems.unitPrice}) DESC`)
+      .limit(5);
+  }
+
+  async getRevenueAnalytics(query: any): Promise<any[]> {
+    const dateRange = parseInt(query.dateRange) || 30;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - dateRange);
+
+    return await db
+      .select({
+        date: sql`TO_CHAR(${sales.createdAt}, 'MM/DD')`,
+        revenue: sql`SUM(${sales.totalAmount})`
+      })
+      .from(sales)
+      .where(sql`${sales.createdAt} >= ${startDate}`)
+      .groupBy(sql`DATE(${sales.createdAt})`)
+      .orderBy(sql`DATE(${sales.createdAt})`)
+      .limit(10);
+  }
+
   // Reference data
   async getDeviceTypes(): Promise<DeviceType[]> {
     return await db.select().from(deviceTypes).orderBy(asc(deviceTypes.name));

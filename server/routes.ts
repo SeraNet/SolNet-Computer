@@ -337,6 +337,120 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Customer endpoints
+  app.get("/api/customers", async (req, res) => {
+    try {
+      const customers = await storage.getCustomers();
+      res.json(customers);
+    } catch (error) {
+      console.error("Error fetching customers:", error);
+      res.status(500).json({ message: "Failed to fetch customers" });
+    }
+  });
+
+  app.get("/api/customers/:id/devices", async (req, res) => {
+    try {
+      const devices = await storage.getCustomerDevices(req.params.id);
+      res.json(devices);
+    } catch (error) {
+      console.error("Error fetching customer devices:", error);
+      res.status(500).json({ message: "Failed to fetch customer devices" });
+    }
+  });
+
+  app.post("/api/customers", async (req, res) => {
+    try {
+      const customerData = insertCustomerSchema.parse(req.body);
+      const customer = await storage.createCustomer(customerData);
+      res.json(customer);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid customer data", errors: error.errors });
+      }
+      console.error("Error creating customer:", error);
+      res.status(500).json({ message: "Failed to create customer" });
+    }
+  });
+
+  app.put("/api/customers/:id", async (req, res) => {
+    try {
+      const updates = insertCustomerSchema.partial().parse(req.body);
+      const customer = await storage.updateCustomer(req.params.id, updates);
+      res.json(customer);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid customer data", errors: error.errors });
+      }
+      console.error("Error updating customer:", error);
+      res.status(500).json({ message: "Failed to update customer" });
+    }
+  });
+
+  // Analytics endpoints
+  app.get("/api/analytics", async (req, res) => {
+    try {
+      const analytics = await storage.getAnalytics(req.query);
+      res.json(analytics);
+    } catch (error) {
+      console.error("Error fetching analytics:", error);
+      res.status(500).json({ message: "Failed to fetch analytics" });
+    }
+  });
+
+  app.get("/api/analytics/sales", async (req, res) => {
+    try {
+      const salesData = await storage.getSalesAnalytics(req.query);
+      res.json(salesData);
+    } catch (error) {
+      console.error("Error fetching sales analytics:", error);
+      res.status(500).json({ message: "Failed to fetch sales analytics" });
+    }
+  });
+
+  app.get("/api/analytics/repairs", async (req, res) => {
+    try {
+      const repairData = await storage.getRepairAnalytics(req.query);
+      res.json(repairData);
+    } catch (error) {
+      console.error("Error fetching repair analytics:", error);
+      res.status(500).json({ message: "Failed to fetch repair analytics" });
+    }
+  });
+
+  app.get("/api/analytics/top-items", async (req, res) => {
+    try {
+      const topItems = await storage.getTopSellingItems(req.query);
+      res.json(topItems);
+    } catch (error) {
+      console.error("Error fetching top items:", error);
+      res.status(500).json({ message: "Failed to fetch top items" });
+    }
+  });
+
+  app.get("/api/analytics/revenue", async (req, res) => {
+    try {
+      const revenueData = await storage.getRevenueAnalytics(req.query);
+      res.json(revenueData);
+    } catch (error) {
+      console.error("Error fetching revenue analytics:", error);
+      res.status(500).json({ message: "Failed to fetch revenue analytics" });
+    }
+  });
+
+  app.put("/api/appointments/:id", async (req, res) => {
+    try {
+      const updates = insertAppointmentSchema.partial().parse(req.body);
+      const appointment = await storage.updateAppointment(req.params.id, updates);
+      res.json(appointment);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid appointment data", errors: error.errors });
+      }
+      console.error("Error updating appointment:", error);
+      res.status(500).json({ message: "Failed to update appointment" });
+    }
+  });
+
   // Reference data
   app.get("/api/device-types", async (req, res) => {
     try {
