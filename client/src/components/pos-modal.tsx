@@ -36,7 +36,7 @@ export default function POSModal({ open, onOpenChange }: POSModalProps) {
 
   const processSaleMutation = useMutation({
     mutationFn: async () => {
-      const totalAmount = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+      const totalAmount = cart.reduce((sum, item) => sum + (parseFloat(String(item.price || "0")) * item.quantity), 0);
       const saleItems = cart.map(item => ({
         inventoryItemId: item.id,
         quantity: item.quantity,
@@ -76,10 +76,10 @@ export default function POSModal({ open, onOpenChange }: POSModalProps) {
     },
   });
 
-  const filteredItems = (inventoryItems || []).filter((item: any) =>
+  const filteredItems = Array.isArray(inventoryItems) ? inventoryItems.filter((item: any) =>
     item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     item.sku.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  ) : [];
 
   const addToCart = (item: any) => {
     const existingItem = cart.find(cartItem => cartItem.id === item.id);
@@ -223,7 +223,7 @@ export default function POSModal({ open, onOpenChange }: POSModalProps) {
                         <div className="flex-1">
                           <div className="font-medium text-sm">{item.name}</div>
                           <div className="text-sm text-gray-500">
-                            ${item.price.toFixed(2)} each
+                            ${parseFloat(String(item.price || "0")).toFixed(2)} each
                           </div>
                         </div>
                         <div className="flex items-center space-x-2">
@@ -243,7 +243,7 @@ export default function POSModal({ open, onOpenChange }: POSModalProps) {
                             <Plus className="h-3 w-3" />
                           </Button>
                           <span className="text-sm font-medium w-16 text-right">
-                            ${(item.price * item.quantity).toFixed(2)}
+                            ${(parseFloat(String(item.price || "0")) * item.quantity).toFixed(2)}
                           </span>
                           <Button
                             size="sm"
