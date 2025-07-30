@@ -74,13 +74,25 @@
 }
 
 /* Print styles for receipts and invoices */
+.print-hidden {
+  position: absolute;
+  left: -9999px;
+  top: -9999px;
+  z-index: -1;
+  visibility: hidden;
+}
+
 @media print {
-  .print-hidden {
-    display: none !important;
+  body * {
+    visibility: hidden;
   }
   
-  .print-visible {
-    display: block !important;
+  .print-hidden, .print-hidden * {
+    visibility: visible;
+    position: static !important;
+    left: auto !important;
+    top: auto !important;
+    z-index: auto !important;
   }
   
   body {

@@ -76,10 +76,10 @@ export default function POSModal({ open, onOpenChange }: POSModalProps) {
     },
   });
 
-  const filteredItems = inventoryItems?.filter((item: any) =>
+  const filteredItems = (inventoryItems || []).filter((item: any) =>
     item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     item.sku.toLowerCase().includes(searchTerm.toLowerCase())
-  ) || [];
+  );
 
   const addToCart = (item: any) => {
     const existingItem = cart.find(cartItem => cartItem.id === item.id);

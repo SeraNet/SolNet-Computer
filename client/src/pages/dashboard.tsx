@@ -25,7 +25,9 @@ import {
   BarChart3
 } from "lucide-react";
 import POSModal from "@/components/pos-modal";
-import { useState } from "react";
+import ReceiptTemplate from "@/components/receipt-template";
+import { useState, useRef } from "react";
+import { useReactToPrint } from "react-to-print";
 
 const deviceRegistrationSchema = z.object({
   customerName: z.string().min(1, "Customer name is required"),
@@ -46,32 +48,42 @@ export default function Dashboard() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [showPOSModal, setShowPOSModal] = useState(false);
+  const [registeredDevice, setRegisteredDevice] = useState<any>(null);
+  const receiptRef = useRef<HTMLDivElement>(null);
+
+  const handlePrint = useReactToPrint({
+    content: () => receiptRef.current,
+    documentTitle: `Device Registration Receipt`,
+    onAfterPrint: () => {
+      setRegisteredDevice(null);
+    },
+  });
 
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ["/api/dashboard/stats"],
   });
 
-  const { data: activeRepairs, isLoading: repairsLoading } = useQuery({
+  const { data: activeRepairs = [], isLoading: repairsLoading } = useQuery({
     queryKey: ["/api/devices/active-repairs"],
   });
 
-  const { data: lowStockItems, isLoading: lowStockLoading } = useQuery({
+  const { data: lowStockItems = [], isLoading: lowStockLoading } = useQuery({
     queryKey: ["/api/inventory/low-stock"],
   });
 
-  const { data: recentSales, isLoading: salesLoading } = useQuery({
+  const { data: recentSales = [], isLoading: salesLoading } = useQuery({
     queryKey: ["/api/sales/today"],
   });
 
-  const { data: deviceTypes } = useQuery({
+  const { data: deviceTypes = [] } = useQuery({
     queryKey: ["/api/device-types"],
   });
 
-  const { data: brands } = useQuery({
+  const { data: brands = [] } = useQuery({
     queryKey: ["/api/brands"],
   });
 
-  const { data: serviceTypes } = useQuery({
+  const { data: serviceTypes = [] } = useQuery({
     queryKey: ["/api/service-types"],
   });
 
@@ -113,16 +125,49 @@ export default function Dashboard() {
         priority: data.priority,
         status: "registered",
       });
-      return deviceResponse.json();
+      
+      const device = await deviceResponse.json();
+      
+      // Get reference data for receipt
+      const deviceType = deviceTypes.find(dt => dt.id === data.deviceTypeId);
+      const brand = brands.find(b => b.id === data.brandId);
+      const serviceType = serviceTypes.find(st => st.id === data.serviceTypeId);
+      
+      return {
+        device,
+        customer,
+        deviceType: deviceType?.name || "Unknown",
+        brand: brand?.name || "Unknown",
+        serviceType: serviceType?.name || "Unknown",
+      };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       toast({
         title: "Device Registered Successfully",
         description: "The device has been registered and a receipt can be printed.",
       });
+
+      // Set up receipt data
+      setRegisteredDevice({
+        receiptNumber: result.device.id.slice(-8).toUpperCase(),
+        date: new Date().toLocaleDateString(),
+        customer: result.customer.name,
+        device: {
+          type: result.deviceType,
+          brand: result.brand,
+          model: form.getValues('modelId') ? 'Model Selected' : 'Generic Model',
+          service: result.serviceType,
+        },
+      });
+
       form.reset();
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/devices/active-repairs"] });
+      
+      // Auto-print receipt after brief delay
+      setTimeout(() => {
+        handlePrint();
+      }, 500);
     },
     onError: (error) => {
       toast({
@@ -672,6 +717,13 @@ export default function Dashboard() {
       </div>
 
       <POSModal open={showPOSModal} onOpenChange={setShowPOSModal} />
+
+      {/* Hidden Receipt Template for Printing */}
+      {registeredDevice && (
+        <div className="print-hidden">
+          <ReceiptTemplate ref={receiptRef} data={registeredDevice} />
+        </div>
+      )}
     </>
   );
 }
