@@ -1041,6 +1041,153 @@ export class DatabaseStorage implements IStorage {
       todayRevenue: todaysRevenue.total,
     };
   }
+  // Users/Workers
+  async getUsers(): Promise<User[]> {
+    return await db.select().from(users).orderBy(users.createdAt);
+  }
+
+  async createUser(data: InsertUser): Promise<User> {
+    const [user] = await db
+      .insert(users)
+      .values(data)
+      .returning();
+    return user;
+  }
+
+  async updateUser(id: string, updates: Partial<InsertUser>): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+    return user;
+  }
+
+  // Service Types
+  async getServiceTypes(): Promise<ServiceType[]> {
+    return await db.select().from(serviceTypes).orderBy(serviceTypes.name);
+  }
+
+  async createServiceType(data: InsertServiceType): Promise<ServiceType> {
+    const [serviceType] = await db
+      .insert(serviceTypes)
+      .values(data)
+      .returning();
+    return serviceType;
+  }
+
+  async updateServiceType(id: string, updates: Partial<InsertServiceType>): Promise<ServiceType> {
+    const [serviceType] = await db
+      .update(serviceTypes)
+      .set(updates)
+      .where(eq(serviceTypes.id, id))
+      .returning();
+    return serviceType;
+  }
+
+  async deleteServiceType(id: string): Promise<void> {
+    await db.delete(serviceTypes).where(eq(serviceTypes.id, id));
+  }
+
+  // Device Types  
+  async createDeviceType(data: InsertDeviceType): Promise<DeviceType> {
+    const [deviceType] = await db
+      .insert(deviceTypes)
+      .values(data)
+      .returning();
+    return deviceType;
+  }
+
+  async updateDeviceType(id: string, updates: Partial<InsertDeviceType>): Promise<DeviceType> {
+    const [deviceType] = await db
+      .update(deviceTypes)
+      .set(updates)
+      .where(eq(deviceTypes.id, id))
+      .returning();
+    return deviceType;
+  }
+
+  async deleteDeviceType(id: string): Promise<void> {
+    await db.delete(deviceTypes).where(eq(deviceTypes.id, id));
+  }
+
+  // Brands
+  async createBrand(data: InsertBrand): Promise<Brand> {
+    const [brand] = await db
+      .insert(brands)
+      .values(data)
+      .returning();
+    return brand;
+  }
+
+  async updateBrand(id: string, updates: Partial<InsertBrand>): Promise<Brand> {
+    const [brand] = await db
+      .update(brands)
+      .set(updates)
+      .where(eq(brands.id, id))
+      .returning();
+    return brand;
+  }
+
+  async deleteBrand(id: string): Promise<void> {
+    await db.delete(brands).where(eq(brands.id, id));
+  }
+
+  // Models
+  async getModels(): Promise<(Model & { brand: Brand; deviceType: DeviceType })[]> {
+    return await db
+      .select({
+        id: models.id,
+        name: models.name,
+        brandId: models.brandId,
+        deviceTypeId: models.deviceTypeId,
+        description: models.description,
+        specifications: models.specifications,
+        releaseYear: models.releaseYear,
+        isActive: models.isActive,
+        createdAt: models.createdAt,
+        brand: {
+          id: brands.id,
+          name: brands.name,
+          description: brands.description,
+          website: brands.website,
+          isActive: brands.isActive,
+          createdAt: brands.createdAt,
+        },
+        deviceType: {
+          id: deviceTypes.id,
+          name: deviceTypes.name,
+          description: deviceTypes.description,
+          isActive: deviceTypes.isActive,
+          createdAt: deviceTypes.createdAt,
+        },
+      })
+      .from(models)
+      .leftJoin(brands, eq(models.brandId, brands.id))
+      .leftJoin(deviceTypes, eq(models.deviceTypeId, deviceTypes.id))
+      .orderBy(models.name);
+  }
+
+  async createModel(data: InsertModel): Promise<Model> {
+    const [model] = await db
+      .insert(models)
+      .values(data)
+      .returning();
+    return model;
+  }
+
+  async updateModel(id: string, updates: Partial<InsertModel>): Promise<Model> {
+    const [model] = await db
+      .update(models)
+      .set(updates)
+      .where(eq(models.id, id))
+      .returning();
+    return model;
+  }
+
+  async deleteModel(id: string): Promise<void> {
+    await db.delete(models).where(eq(models.id, id));
+  }
 }
 
 export const storage = new DatabaseStorage();

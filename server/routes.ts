@@ -348,6 +348,172 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Service Types
+  app.get("/api/service-types", async (req, res) => {
+    try {
+      const serviceTypes = await storage.getServiceTypes();
+      res.json(serviceTypes);
+    } catch (error) {
+      console.error("Error fetching service types:", error);
+      res.status(500).json({ message: "Failed to fetch service types" });
+    }
+  });
+
+  app.post("/api/service-types", async (req, res) => {
+    try {
+      const data = insertServiceTypeSchema.parse(req.body);
+      const serviceType = await storage.createServiceType(data);
+      res.status(201).json(serviceType);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid service type data", errors: error.errors });
+      }
+      console.error("Error creating service type:", error);
+      res.status(500).json({ message: "Failed to create service type" });
+    }
+  });
+
+  app.put("/api/service-types/:id", async (req, res) => {
+    try {
+      const updates = insertServiceTypeSchema.partial().parse(req.body);
+      const serviceType = await storage.updateServiceType(req.params.id, updates);
+      res.json(serviceType);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid service type data", errors: error.errors });
+      }
+      console.error("Error updating service type:", error);
+      res.status(500).json({ message: "Failed to update service type" });
+    }
+  });
+
+  app.delete("/api/service-types/:id", async (req, res) => {
+    try {
+      await storage.deleteServiceType(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting service type:", error);
+      res.status(500).json({ message: "Failed to delete service type" });
+    }
+  });
+
+  // Device Types
+  app.post("/api/device-types", async (req, res) => {
+    try {
+      const data = insertDeviceTypeSchema.parse(req.body);
+      const deviceType = await storage.createDeviceType(data);
+      res.status(201).json(deviceType);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid device type data", errors: error.errors });
+      }
+      console.error("Error creating device type:", error);
+      res.status(500).json({ message: "Failed to create device type" });
+    }
+  });
+
+  app.put("/api/device-types/:id", async (req, res) => {
+    try {
+      const updates = insertDeviceTypeSchema.partial().parse(req.body);
+      const deviceType = await storage.updateDeviceType(req.params.id, updates);
+      res.json(deviceType);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid device type data", errors: error.errors });
+      }
+      console.error("Error updating device type:", error);
+      res.status(500).json({ message: "Failed to update device type" });
+    }
+  });
+
+  app.delete("/api/device-types/:id", async (req, res) => {
+    try {
+      await storage.deleteDeviceType(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting device type:", error);
+      res.status(500).json({ message: "Failed to delete device type" });
+    }
+  });
+
+  // Brands
+  app.post("/api/brands", async (req, res) => {
+    try {
+      const data = insertBrandSchema.parse(req.body);
+      const brand = await storage.createBrand(data);
+      res.status(201).json(brand);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid brand data", errors: error.errors });
+      }
+      console.error("Error creating brand:", error);
+      res.status(500).json({ message: "Failed to create brand" });
+    }
+  });
+
+  app.put("/api/brands/:id", async (req, res) => {
+    try {
+      const updates = insertBrandSchema.partial().parse(req.body);
+      const brand = await storage.updateBrand(req.params.id, updates);
+      res.json(brand);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid brand data", errors: error.errors });
+      }
+      console.error("Error updating brand:", error);
+      res.status(500).json({ message: "Failed to update brand" });
+    }
+  });
+
+  app.delete("/api/brands/:id", async (req, res) => {
+    try {
+      await storage.deleteBrand(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting brand:", error);
+      res.status(500).json({ message: "Failed to delete brand" });
+    }
+  });
+
+  // Models
+  app.post("/api/models", async (req, res) => {
+    try {
+      const data = insertModelSchema.parse(req.body);
+      const model = await storage.createModel(data);
+      res.status(201).json(model);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid model data", errors: error.errors });
+      }
+      console.error("Error creating model:", error);
+      res.status(500).json({ message: "Failed to create model" });
+    }
+  });
+
+  app.put("/api/models/:id", async (req, res) => {
+    try {
+      const updates = insertModelSchema.partial().parse(req.body);
+      const model = await storage.updateModel(req.params.id, updates);
+      res.json(model);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid model data", errors: error.errors });
+      }
+      console.error("Error updating model:", error);
+      res.status(500).json({ message: "Failed to update model" });
+    }
+  });
+
+  app.delete("/api/models/:id", async (req, res) => {
+    try {
+      await storage.deleteModel(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting model:", error);
+      res.status(500).json({ message: "Failed to delete model" });
+    }
+  });
+
   // Inventory
   app.get("/api/inventory", async (req, res) => {
     try {
