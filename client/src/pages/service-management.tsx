@@ -371,7 +371,7 @@ function ServiceTypesTab() {
                         <div className="text-sm text-gray-600">{item.description}</div>
                       </div>
                     </TableCell>
-                    <TableCell>${item.basePrice?.toFixed(2) || "0.00"}</TableCell>
+                    <TableCell>${parseFloat(item.basePrice || "0").toFixed(2)}</TableCell>
                     <TableCell>{item.estimatedDuration} min</TableCell>
                     <TableCell>
                       <Badge variant={item.isActive ? "default" : "secondary"}>
