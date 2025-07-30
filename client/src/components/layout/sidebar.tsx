@@ -23,6 +23,7 @@ const navigationItems = [
   { name: "Appointments", href: "/appointments", icon: Calendar },
   { name: "Analytics", href: "/analytics", icon: BarChart3 },
   { name: "Workers", href: "/workers", icon: Users },
+  { name: "Service Management", href: "/service-management", icon: Settings },
   { name: "Locations", href: "/locations", icon: MapPin },
   { name: "Settings", href: "/settings", icon: Settings },
 ];

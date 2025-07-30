@@ -1041,6 +1041,7 @@ export class DatabaseStorage implements IStorage {
       todayRevenue: todaysRevenue.total,
     };
   }
+
   // Users/Workers
   async getUsers(): Promise<User[]> {
     return await db.select().from(users).orderBy(users.createdAt);
@@ -1133,35 +1134,10 @@ export class DatabaseStorage implements IStorage {
     await db.delete(brands).where(eq(brands.id, id));
   }
 
-  // Models
-  async getModels(): Promise<(Model & { brand: Brand; deviceType: DeviceType })[]> {
+  // Models - Fixed query
+  async getModels(): Promise<any[]> {
     return await db
-      .select({
-        id: models.id,
-        name: models.name,
-        brandId: models.brandId,
-        deviceTypeId: models.deviceTypeId,
-        description: models.description,
-        specifications: models.specifications,
-        releaseYear: models.releaseYear,
-        isActive: models.isActive,
-        createdAt: models.createdAt,
-        brand: {
-          id: brands.id,
-          name: brands.name,
-          description: brands.description,
-          website: brands.website,
-          isActive: brands.isActive,
-          createdAt: brands.createdAt,
-        },
-        deviceType: {
-          id: deviceTypes.id,
-          name: deviceTypes.name,
-          description: deviceTypes.description,
-          isActive: deviceTypes.isActive,
-          createdAt: deviceTypes.createdAt,
-        },
-      })
+      .select()
       .from(models)
       .leftJoin(brands, eq(models.brandId, brands.id))
       .leftJoin(deviceTypes, eq(models.deviceTypeId, deviceTypes.id))
