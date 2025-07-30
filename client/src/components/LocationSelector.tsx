@@ -6,12 +6,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useLocationData, useCurrentLocation } from "@/hooks/useLocation";
+import { useCurrentLocation } from "@/hooks/useLocation";
 import type { Location } from "@shared/schema";
 
 export function LocationSelector() {
-  const { locations, isLoading } = useLocationData();
-  const { currentLocation, setCurrentLocation } = useCurrentLocation();
+  const { currentLocation, changeLocation, locations, isLoading } = useCurrentLocation();
 
   if (isLoading) {
     return (
@@ -31,10 +30,7 @@ export function LocationSelector() {
     );
   }
 
-  // Auto-select first location if none selected
-  if (!currentLocation && locations.length > 0) {
-    setCurrentLocation(locations[0]);
-  }
+  // Location auto-selection is handled by the hook
 
   return (
     <DropdownMenu>
@@ -53,7 +49,7 @@ export function LocationSelector() {
         {locations.map((location: Location) => (
           <DropdownMenuItem
             key={location.id}
-            onClick={() => setCurrentLocation(location)}
+            onClick={() => changeLocation(location)}
             className={currentLocation?.id === location.id ? "bg-accent" : ""}
           >
             <div className="flex flex-col">

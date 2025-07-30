@@ -8,7 +8,7 @@ import Dashboard from "@/pages/dashboard";
 import DeviceRegistration from "@/pages/device-registration-fixed";
 import RepairTracking from "@/pages/repair-tracking";
 import PointOfSale from "@/pages/point-of-sale";
-import Inventory from "@/pages/inventory";
+import Inventory from "@/pages/inventory-complete";
 import InventoryManagement from "@/pages/inventory-management";
 import Customers from "@/pages/customers";
 import Appointments from "@/pages/appointments";

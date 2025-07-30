@@ -1,26 +1,18 @@
-import { useState, useEffect, createContext, useContext } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import type { Location } from "@shared/schema";
 
-interface LocationContextType {
-  currentLocation: Location | null;
-  setCurrentLocation: (location: Location | null) => void;
-  locations: Location[];
-  isLoading: boolean;
-}
-
-const LocationContext = createContext<LocationContextType | undefined>(undefined);
-
-export function useLocation() {
-  const context = useContext(LocationContext);
-  if (context === undefined) {
-    throw new Error("useLocation must be used within a LocationProvider");
-  }
-  return context;
+export interface Location {
+  id: string;
+  name: string;
+  code: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  isActive: boolean;
 }
 
 export function useLocationData() {
-  const { data: locations = [], isLoading } = useQuery({
+  const { data: locations = [], isLoading } = useQuery<Location[]>({
     queryKey: ["/api/locations/active"],
   });
 
@@ -28,19 +20,39 @@ export function useLocationData() {
 }
 
 export function useCurrentLocation() {
-  const [currentLocation, setCurrentLocationState] = useState<Location | null>(() => {
-    const saved = localStorage.getItem("currentLocation");
-    return saved ? JSON.parse(saved) : null;
+  const [currentLocation, setCurrentLocation] = useState<Location | null>(null);
+
+  const { data: locations = [] } = useQuery<Location[]>({
+    queryKey: ["/api/locations/active"],
   });
 
-  const setCurrentLocation = (location: Location | null) => {
-    setCurrentLocationState(location);
-    if (location) {
-      localStorage.setItem("currentLocation", JSON.stringify(location));
-    } else {
-      localStorage.removeItem("currentLocation");
+  useEffect(() => {
+    // Try to get saved location from localStorage
+    const savedLocationId = localStorage.getItem("currentLocationId");
+    if (savedLocationId && locations.length > 0) {
+      const savedLocation = locations.find(loc => loc.id === savedLocationId);
+      if (savedLocation) {
+        setCurrentLocation(savedLocation);
+        return;
+      }
     }
+
+    // If no saved location or saved location not found, use first active location
+    if (locations.length > 0 && !currentLocation) {
+      setCurrentLocation(locations[0]);
+      localStorage.setItem("currentLocationId", locations[0].id);
+    }
+  }, [locations, currentLocation]);
+
+  const changeLocation = (location: Location) => {
+    setCurrentLocation(location);
+    localStorage.setItem("currentLocationId", location.id);
   };
 
-  return { currentLocation, setCurrentLocation };
+  return {
+    currentLocation,
+    changeLocation,
+    locations,
+    isLoading: !locations.length && currentLocation === null,
+  };
 }

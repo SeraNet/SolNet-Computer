@@ -445,6 +445,19 @@ export class DatabaseStorage implements IStorage {
     return item;
   }
 
+  async deleteInventoryItem(id: string): Promise<void> {
+    await db.update(inventoryItems).set({ isActive: false }).where(eq(inventoryItems.id, id));
+  }
+
+  async updateInventoryQuantity(id: string, quantity: number): Promise<InventoryItem> {
+    const [item] = await db
+      .update(inventoryItems)
+      .set({ quantity, updatedAt: sql`NOW()` })
+      .where(eq(inventoryItems.id, id))
+      .returning();
+    return item;
+  }
+
   async getInventoryItemsByLocation(locationId: string): Promise<InventoryItem[]> {
     return await db
       .select()
