@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
-import DeviceRegistration from "@/pages/device-registration";
+import DeviceRegistration from "@/pages/device-registration-fixed";
 import RepairTracking from "@/pages/repair-tracking";
 import PointOfSale from "@/pages/point-of-sale";
 import Inventory from "@/pages/inventory";

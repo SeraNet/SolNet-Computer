@@ -26,28 +26,29 @@ import {
   FileText,
   CheckCircle
 } from "lucide-react";
-import { insertDeviceSchema, insertCustomerSchema } from "@shared/schema";
 import { useCurrentLocation } from "@/hooks/useLocation";
 
-const deviceRegistrationSchema = insertDeviceSchema.extend({
+const deviceRegistrationSchema = z.object({
   customerName: z.string().min(1, "Customer name is required"),
   customerPhone: z.string().min(1, "Customer phone is required"),
   customerEmail: z.string().email().optional().or(z.literal("")),
+  deviceTypeId: z.string().min(1, "Device type is required"),
+  brandId: z.string().min(1, "Brand is required"),
+  modelId: z.string().min(1, "Model is required"),
+  serviceTypeId: z.string().min(1, "Service type is required"),
+  serialNumber: z.string().optional(),
+  problemDescription: z.string().min(1, "Problem description is required"),
+  customerNotes: z.string().optional(),
+  priority: z.enum(["normal", "high", "urgent"]),
   estimatedCost: z.number().min(0).optional(),
-}).omit({ 
-  customerId: true,
-  locationId: true,
-  totalCost: true,
-  paymentStatus: true,
-  createdAt: true,
-  updatedAt: true
 });
 
 type DeviceRegistrationForm = z.infer<typeof deviceRegistrationSchema>;
 
-const customerSchema = insertCustomerSchema.extend({
+const customerSchema = z.object({
   name: z.string().min(1, "Name is required"),
   phone: z.string().min(1, "Phone is required"),
+  email: z.string().email().optional().or(z.literal("")),
 });
 
 type CustomerForm = z.infer<typeof customerSchema>;
@@ -72,11 +73,14 @@ export default function DeviceRegistration() {
   const deviceForm = useForm<DeviceRegistrationForm>({
     resolver: zodResolver(deviceRegistrationSchema),
     defaultValues: {
-      status: "registered",
       priority: "normal",
       problemDescription: "",
       customerNotes: "",
       estimatedCost: 0,
+      customerName: "",
+      customerPhone: "",
+      customerEmail: "",
+      serialNumber: "",
     },
   });
 
@@ -134,7 +138,7 @@ export default function DeviceRegistration() {
   });
 
   const handlePrint = useReactToPrint({
-    contentRef: receiptRef,
+    content: () => receiptRef.current,
     documentTitle: `Device Registration Receipt - ${registeredDevice?.id || 'Unknown'}`,
   });
 
@@ -175,7 +179,7 @@ export default function DeviceRegistration() {
       };
       
       createCustomerMutation.mutate(customerData, {
-        onSuccess: (customer) => {
+        onSuccess: (customer: any) => {
           const deviceData = {
             customerId: customer.id,
             locationId: currentLocation.id,
@@ -183,10 +187,10 @@ export default function DeviceRegistration() {
             brandId: data.brandId,
             modelId: data.modelId,
             serviceTypeId: data.serviceTypeId,
-            serialNumber: data.serialNumber,
+            serialNumber: data.serialNumber || null,
             problemDescription: data.problemDescription,
-            customerNotes: data.customerNotes,
-            status: data.status,
+            customerNotes: data.customerNotes || null,
+            status: "registered",
             priority: data.priority,
             totalCost: data.estimatedCost || 0,
             paymentStatus: "pending",
@@ -202,10 +206,10 @@ export default function DeviceRegistration() {
         brandId: data.brandId,
         modelId: data.modelId,
         serviceTypeId: data.serviceTypeId,
-        serialNumber: data.serialNumber,
+        serialNumber: data.serialNumber || null,
         problemDescription: data.problemDescription,
-        customerNotes: data.customerNotes,
-        status: data.status,
+        customerNotes: data.customerNotes || null,
+        status: "registered",
         priority: data.priority,
         totalCost: data.estimatedCost || 0,
         paymentStatus: "pending",
@@ -243,106 +247,94 @@ export default function DeviceRegistration() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CheckCircle className="h-5 w-5 text-green-600" />
-                Registration Summary
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label className="text-sm font-medium text-gray-600">Device ID</Label>
-                <p className="font-mono text-sm bg-gray-100 p-2 rounded">{registeredDevice.id}</p>
+        {/* Receipt */}
+        <div ref={receiptRef} className="max-w-md mx-auto bg-white p-6 border">
+          <div className="text-center mb-6">
+            <h2 className="text-xl font-bold">LeulNet Computer Services</h2>
+            {currentLocation && (
+              <div className="text-sm text-gray-600 mt-2">
+                <p>{currentLocation.name}</p>
+                <p>{currentLocation.address}</p>
+                <p>{currentLocation.city}, {currentLocation.state} {currentLocation.zipCode}</p>
+                {currentLocation.phone && <p>Phone: {currentLocation.phone}</p>}
               </div>
-              <div>
-                <Label className="text-sm font-medium text-gray-600">Customer</Label>
-                <p>{selectedCustomer?.name || deviceForm.getValues("customerName")}</p>
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-gray-600">Device</Label>
-                <p>{deviceTypes.find((dt: any) => dt.id === registeredDevice.deviceTypeId)?.name} - {brands.find((b: any) => b.id === registeredDevice.brandId)?.name}</p>
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-gray-600">Status</Label>
-                <Badge className="bg-blue-100 text-blue-800">
-                  {registeredDevice.status.replace(/_/g, " ").replace(/\b\w/g, (l: string) => l.toUpperCase())}
-                </Badge>
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-gray-600">Estimated Cost</Label>
-                <p>${registeredDevice.totalCost?.toFixed(2) || "0.00"}</p>
-              </div>
-            </CardContent>
-          </Card>
+            )}
+          </div>
 
-          {/* Hidden Receipt for Printing */}
-          <div style={{ display: "none" }}>
-            <div ref={receiptRef} className="p-8 max-w-md mx-auto bg-white">
-              <div className="text-center mb-6">
-                <h1 className="text-2xl font-bold">LeulNet Computer Services</h1>
-                <p className="text-sm text-gray-600">Device Registration Receipt</p>
-                <p className="text-xs text-gray-500">Date: {new Date().toLocaleDateString()}</p>
+          <div className="border-t border-b py-4 mb-4">
+            <h3 className="font-semibold mb-2">Device Registration Receipt</h3>
+            <div className="space-y-1 text-sm">
+              <div className="flex justify-between">
+                <span>Receipt #:</span>
+                <span>{registeredDevice.id}</span>
               </div>
-
-              <div className="border-t border-b border-gray-300 py-4 mb-4">
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <strong>Device ID:</strong>
-                    <p className="font-mono text-xs">{registeredDevice.id}</p>
-                  </div>
-                  <div>
-                    <strong>Status:</strong>
-                    <p>{registeredDevice.status}</p>
-                  </div>
-                  <div>
-                    <strong>Priority:</strong>
-                    <p>{registeredDevice.priority}</p>
-                  </div>
-                  <div>
-                    <strong>Est. Cost:</strong>
-                    <p>${registeredDevice.totalCost?.toFixed(2) || "0.00"}</p>
-                  </div>
-                </div>
+              <div className="flex justify-between">
+                <span>Date:</span>
+                <span>{new Date().toLocaleDateString()}</span>
               </div>
-
-              <div className="mb-4">
-                <h3 className="font-semibold mb-2">Customer Information</h3>
-                <div className="text-sm space-y-1">
-                  <p><strong>Name:</strong> {selectedCustomer?.name || deviceForm.getValues("customerName")}</p>
-                  <p><strong>Phone:</strong> {selectedCustomer?.phone || deviceForm.getValues("customerPhone")}</p>
-                  {(selectedCustomer?.email || deviceForm.getValues("customerEmail")) && (
-                    <p><strong>Email:</strong> {selectedCustomer?.email || deviceForm.getValues("customerEmail")}</p>
-                  )}
-                </div>
+              <div className="flex justify-between">
+                <span>Customer:</span>
+                <span>{deviceForm.getValues("customerName")}</span>
               </div>
-
-              <div className="mb-4">
-                <h3 className="font-semibold mb-2">Device Information</h3>
-                <div className="text-sm space-y-1">
-                  <p><strong>Type:</strong> {deviceTypes.find((dt: any) => dt.id === registeredDevice.deviceTypeId)?.name}</p>
-                  <p><strong>Brand:</strong> {brands.find((b: any) => b.id === registeredDevice.brandId)?.name}</p>
-                  <p><strong>Model:</strong> {models.find((m: any) => m.id === registeredDevice.modelId)?.name}</p>
-                  {registeredDevice.serialNumber && (
-                    <p><strong>Serial:</strong> {registeredDevice.serialNumber}</p>
-                  )}
-                  <p><strong>Service:</strong> {serviceTypes.find((st: any) => st.id === registeredDevice.serviceTypeId)?.name}</p>
-                </div>
-              </div>
-
-              {registeredDevice.problemDescription && (
-                <div className="mb-4">
-                  <h3 className="font-semibold mb-2">Problem Description</h3>
-                  <p className="text-sm">{registeredDevice.problemDescription}</p>
-                </div>
-              )}
-
-              <div className="border-t border-gray-300 pt-4 mt-4 text-center text-xs text-gray-500">
-                <p>Please keep this receipt for your records</p>
-                <p>Contact us for updates on your device status</p>
+              <div className="flex justify-between">
+                <span>Phone:</span>
+                <span>{deviceForm.getValues("customerPhone")}</span>
               </div>
             </div>
+          </div>
+
+          <div className="mb-4">
+            <h4 className="font-semibold mb-2">Device Information</h4>
+            <div className="space-y-1 text-sm">
+              <div className="flex justify-between">
+                <span>Type:</span>
+                <span>{deviceTypes.find((dt: any) => dt.id === deviceForm.getValues("deviceTypeId"))?.name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Brand:</span>
+                <span>{brands.find((b: any) => b.id === deviceForm.getValues("brandId"))?.name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Model:</span>
+                <span>{models.find((m: any) => m.id === deviceForm.getValues("modelId"))?.name}</span>
+              </div>
+              {deviceForm.getValues("serialNumber") && (
+                <div className="flex justify-between">
+                  <span>Serial:</span>
+                  <span>{deviceForm.getValues("serialNumber")}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="mb-4">
+            <h4 className="font-semibold mb-2">Service Details</h4>
+            <div className="space-y-1 text-sm">
+              <div className="flex justify-between">
+                <span>Service:</span>
+                <span>{serviceTypes.find((st: any) => st.id === deviceForm.getValues("serviceTypeId"))?.name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Priority:</span>
+                <span className="capitalize">{deviceForm.getValues("priority")}</span>
+              </div>
+              {deviceForm.getValues("estimatedCost") && deviceForm.getValues("estimatedCost") > 0 && (
+                <div className="flex justify-between">
+                  <span>Est. Cost:</span>
+                  <span>${(deviceForm.getValues("estimatedCost") || 0).toFixed(2)}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="mb-4">
+            <h4 className="font-semibold mb-2">Problem Description</h4>
+            <p className="text-sm">{deviceForm.getValues("problemDescription")}</p>
+          </div>
+
+          <div className="text-center text-sm text-gray-600 mt-6">
+            <p>Thank you for choosing LeulNet!</p>
+            <p>Keep this receipt for your records.</p>
           </div>
         </div>
       </div>
@@ -474,7 +466,7 @@ export default function DeviceRegistration() {
                       <FormItem>
                         <FormLabel>Email</FormLabel>
                         <FormControl>
-                          <Input {...field} type="email" value={field.value || ""} />
+                          <Input {...field} type="email" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -508,12 +500,59 @@ export default function DeviceRegistration() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Smartphone className="h-5 w-5" />
-                Device Information
+                Device Registration
               </CardTitle>
             </CardHeader>
             <CardContent>
               <Form {...deviceForm}>
                 <form onSubmit={deviceForm.handleSubmit(onSubmitDevice)} className="space-y-6">
+                  {/* Customer Info (if not selected from list) */}
+                  {!selectedCustomer && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded bg-gray-50">
+                      <h3 className="col-span-full font-medium mb-2">Customer Details</h3>
+                      <FormField
+                        control={deviceForm.control}
+                        name="customerName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Customer Name *</FormLabel>
+                            <FormControl>
+                              <Input {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={deviceForm.control}
+                        name="customerPhone"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Phone *</FormLabel>
+                            <FormControl>
+                              <Input {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={deviceForm.control}
+                        name="customerEmail"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Email</FormLabel>
+                            <FormControl>
+                              <Input {...field} type="email" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  )}
+
+                  {/* Device Details */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField
                       control={deviceForm.control}
@@ -521,7 +560,7 @@ export default function DeviceRegistration() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Device Type *</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Select device type" />
@@ -546,7 +585,7 @@ export default function DeviceRegistration() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Brand *</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Select brand" />
@@ -570,8 +609,8 @@ export default function DeviceRegistration() {
                       name="modelId"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Model</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormLabel>Model *</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Select model" />
@@ -596,7 +635,7 @@ export default function DeviceRegistration() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Service Type *</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Select service type" />
@@ -622,7 +661,7 @@ export default function DeviceRegistration() {
                         <FormItem>
                           <FormLabel>Serial Number</FormLabel>
                           <FormControl>
-                            <Input {...field} />
+                            <Input {...field} value={field.value || ""} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -635,15 +674,14 @@ export default function DeviceRegistration() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Priority</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="low">Low</SelectItem>
-                              <SelectItem value="medium">Medium</SelectItem>
+                              <SelectItem value="normal">Normal</SelectItem>
                               <SelectItem value="high">High</SelectItem>
                               <SelectItem value="urgent">Urgent</SelectItem>
                             </SelectContent>
@@ -661,10 +699,9 @@ export default function DeviceRegistration() {
                       <FormItem>
                         <FormLabel>Problem Description *</FormLabel>
                         <FormControl>
-                          <Textarea
-                            {...field}
+                          <Textarea 
                             placeholder="Describe the issue with the device..."
-                            className="min-h-[100px]"
+                            {...field}
                           />
                         </FormControl>
                         <FormMessage />
@@ -679,9 +716,10 @@ export default function DeviceRegistration() {
                       <FormItem>
                         <FormLabel>Customer Notes</FormLabel>
                         <FormControl>
-                          <Textarea
-                            {...field}
+                          <Textarea 
                             placeholder="Additional notes from customer..."
+                            {...field}
+                            value={field.value || ""}
                           />
                         </FormControl>
                         <FormMessage />
@@ -696,12 +734,12 @@ export default function DeviceRegistration() {
                       <FormItem>
                         <FormLabel>Estimated Cost</FormLabel>
                         <FormControl>
-                          <Input
-                            {...field}
-                            type="number"
+                          <Input 
+                            type="number" 
+                            min="0" 
                             step="0.01"
-                            min="0"
-                            onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                            {...field}
+                            onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : 0)}
                           />
                         </FormControl>
                         <FormMessage />
@@ -709,57 +747,15 @@ export default function DeviceRegistration() {
                     )}
                   />
 
-                  {!selectedCustomer && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded bg-gray-50">
-                      <h3 className="md:col-span-2 font-medium text-gray-900">New Customer Details</h3>
-                      <FormField
-                        control={deviceForm.control}
-                        name="customerName"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Customer Name *</FormLabel>
-                            <FormControl>
-                              <Input {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={deviceForm.control}
-                        name="customerPhone"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Customer Phone *</FormLabel>
-                            <FormControl>
-                              <Input {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={deviceForm.control}
-                        name="customerEmail"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Customer Email</FormLabel>
-                            <FormControl>
-                              <Input {...field} type="email" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                  )}
-
-                  <Button
-                    type="submit"
+                  <Button 
+                    type="submit" 
                     className="w-full"
-                    disabled={createDeviceMutation.isPending}
+                    disabled={createDeviceMutation.isPending || createCustomerMutation.isPending}
                   >
-                    {createDeviceMutation.isPending ? "Registering..." : "Register Device & Print Receipt"}
+                    {createDeviceMutation.isPending || createCustomerMutation.isPending 
+                      ? "Registering..." 
+                      : "Register Device"
+                    }
                   </Button>
                 </form>
               </Form>
