@@ -16,6 +16,7 @@ import Analytics from "@/pages/analytics";
 import Settings from "@/pages/settings";
 import ServiceManagement from "@/pages/service-management";
 import Locations from "@/pages/locations";
+import Workers from "@/pages/workers";
 import AppLayout from "@/components/layout/app-layout";
 
 function Router() {
@@ -33,6 +34,7 @@ function Router() {
         <Route path="/analytics" component={Analytics} />
         <Route path="/service-management" component={ServiceManagement} />
         <Route path="/locations" component={Locations} />
+        <Route path="/workers" component={Workers} />
         <Route path="/settings" component={Settings} />
         <Route component={NotFound} />
       </Switch>

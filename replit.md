@@ -40,20 +40,22 @@ The application follows a full-stack monorepo structure with clear separation be
 ## Key Components
 
 ### Core Business Entities
-1. **Users**: Role-based system (admin, technician, sales)
+1. **Users/Workers**: Role-based system with registration and management (admin, technician, sales)
 2. **Customers**: Customer information and contact details
 3. **Devices**: Device registration with type, brand, model classification
 4. **Repairs**: Device status tracking through repair lifecycle
-5. **Inventory**: Stock management for parts and products
+5. **Inventory**: Stock management for parts and products with location-based tracking
 6. **Sales**: Point-of-sale system with transaction tracking
 7. **Appointments**: Scheduling system for customer interactions
+8. **Locations**: Multi-location support for chain store operations
 
 ### Application Features
 - **Dashboard**: Business metrics and quick actions with device registration and receipt printing
 - **Device Registration**: New device intake with automatic receipt printing
 - **Repair Tracking**: Status monitoring through repair stages
 - **Point of Sale**: Transaction processing with shopping cart and inventory integration
-- **Inventory Management**: Stock levels, product catalog with item registration forms
+- **Inventory Management**: Stock levels, product catalog with item registration forms and real-time stock tracking
+- **Worker Management**: Company employee registration with role-based access (admin, technician, sales)
 - **Service Management**: Device types, brands, models, and service types configuration
 - **Customer Management**: Contact information and service history
 - **Appointment Scheduling**: Calendar and booking system

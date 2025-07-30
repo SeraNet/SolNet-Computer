@@ -22,6 +22,7 @@ const navigationItems = [
   { name: "Customers", href: "/customers", icon: Users },
   { name: "Appointments", href: "/appointments", icon: Calendar },
   { name: "Analytics", href: "/analytics", icon: BarChart3 },
+  { name: "Workers", href: "/workers", icon: Users },
   { name: "Locations", href: "/locations", icon: MapPin },
   { name: "Settings", href: "/settings", icon: Settings },
 ];
