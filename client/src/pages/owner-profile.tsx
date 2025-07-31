@@ -409,11 +409,22 @@ export default function OwnerProfile() {
                   <div className="space-y-4">
                     <h4 className="font-medium">Quick Actions</h4>
                     <div className="grid grid-cols-2 gap-4">
-                      <Button variant="outline" className="h-20 flex-col space-y-2">
+                      <Button 
+                        variant="outline" 
+                        className="h-20 flex-col space-y-2"
+                        onClick={() => window.print()}
+                      >
                         <FileText className="h-6 w-6" />
                         <span>Generate Business Report</span>
                       </Button>
-                      <Button variant="outline" className="h-20 flex-col space-y-2">
+                      <Button 
+                        variant="outline" 
+                        className="h-20 flex-col space-y-2"
+                        onClick={() => toast({
+                          title: "Advanced Settings",
+                          description: "Advanced settings will be available in future updates.",
+                        })}
+                      >
                         <Settings className="h-6 w-6" />
                         <span>Advanced Settings</span>
                       </Button>
