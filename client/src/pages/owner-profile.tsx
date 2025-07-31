@@ -24,12 +24,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { BusinessReportTemplate } from "@/components/business-report-template";
+import { AdvancedSettingsModal } from "@/components/advanced-settings-modal";
 import { type InsertBusinessProfile, type BusinessProfile } from "@shared/schema";
 
 export default function OwnerProfile() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("general");
+  const [showReport, setShowReport] = useState(false);
+  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: profile, isLoading } = useQuery<BusinessProfile>({
@@ -412,7 +416,7 @@ export default function OwnerProfile() {
                       <Button 
                         variant="outline" 
                         className="h-20 flex-col space-y-2"
-                        onClick={() => window.print()}
+                        onClick={() => setShowReport(true)}
                       >
                         <FileText className="h-6 w-6" />
                         <span>Generate Business Report</span>
@@ -420,10 +424,7 @@ export default function OwnerProfile() {
                       <Button 
                         variant="outline" 
                         className="h-20 flex-col space-y-2"
-                        onClick={() => toast({
-                          title: "Advanced Settings",
-                          description: "Advanced settings will be available in future updates.",
-                        })}
+                        onClick={() => setShowAdvancedSettings(true)}
                       >
                         <Settings className="h-6 w-6" />
                         <span>Advanced Settings</span>
@@ -452,6 +453,32 @@ export default function OwnerProfile() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Business Report Modal */}
+      {showReport && profile && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 no-print">
+          <div className="bg-white rounded-lg p-6 max-w-6xl max-h-[90vh] overflow-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-bold">Business Report</h2>
+              <div className="space-x-2">
+                <Button onClick={() => window.print()} variant="default">
+                  Print Report
+                </Button>
+                <Button onClick={() => setShowReport(false)} variant="outline">
+                  Close
+                </Button>
+              </div>
+            </div>
+            <BusinessReportTemplate profile={profile} />
+          </div>
+        </div>
+      )}
+
+      {/* Advanced Settings Modal */}
+      <AdvancedSettingsModal 
+        isOpen={showAdvancedSettings} 
+        onClose={() => setShowAdvancedSettings(false)} 
+      />
     </div>
   );
 }

@@ -19,6 +19,8 @@ import ServiceManagement from "@/pages/service-management";
 import Locations from "@/pages/locations";
 import Workers from "@/pages/workers";
 import OwnerProfile from "@/pages/owner-profile";
+import Expenses from "@/pages/expenses";
+import LoanInvoices from "@/pages/loan-invoices";
 import AppLayout from "@/components/layout/app-layout";
 
 function Router() {
@@ -39,6 +41,8 @@ function Router() {
         <Route path="/locations" component={Locations} />
         <Route path="/workers" component={Workers} />
         <Route path="/owner-profile" component={OwnerProfile} />
+        <Route path="/expenses" component={Expenses} />
+        <Route path="/loan-invoices" component={LoanInvoices} />
         <Route path="/settings" component={Settings} />
         <Route component={NotFound} />
       </Switch>

@@ -11,7 +11,9 @@ import {
   MapPin,
   Settings,
   TrendingUp,
-  User
+  User,
+  Receipt,
+  DollarSign
 } from "lucide-react";
 import { LocationSelector } from "@/components/LocationSelector";
 
@@ -25,6 +27,8 @@ const navigationItems = [
   { name: "Customers", href: "/customers", icon: Users },
   { name: "Appointments", href: "/appointments", icon: Calendar },
   { name: "Analytics", href: "/analytics", icon: BarChart3 },
+  { name: "Expenses", href: "/expenses", icon: DollarSign },
+  { name: "Loan Invoices", href: "/loan-invoices", icon: Receipt },
   { name: "Workers", href: "/workers", icon: Users },
   { name: "Service Management", href: "/service-management", icon: Settings },
   { name: "Locations", href: "/locations", icon: MapPin },
