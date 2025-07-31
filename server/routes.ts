@@ -1132,7 +1132,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(expense);
     } catch (error) {
       console.error("Error creating expense:", error);
-      res.status(500).json({ message: "Failed to create expense", details: error.message });
+      res.status(500).json({ message: "Failed to create expense", details: (error as Error).message });
     }
   });
 
