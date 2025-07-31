@@ -40,7 +40,7 @@ export default function Locations() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: locations = [], isLoading } = useQuery({
+  const { data: locations = [], isLoading } = useQuery<Location[]>({
     queryKey: ["/api/locations"],
   });
 
@@ -65,7 +65,8 @@ export default function Locations() {
 
   const createMutation = useMutation({
     mutationFn: async (data: InsertLocation) => {
-      return await apiRequest("/api/locations", "POST", data);
+      const response = await apiRequest("POST", "/api/locations", data);
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/locations"] });
@@ -89,7 +90,8 @@ export default function Locations() {
 
   const updateMutation = useMutation({
     mutationFn: async (data: { id: string; updates: Partial<InsertLocation> }) => {
-      return await apiRequest(`/api/locations/${data.id}`, "PUT", data.updates);
+      const response = await apiRequest("PUT", `/api/locations/${data.id}`, data.updates);
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/locations"] });
@@ -259,7 +261,7 @@ export default function Locations() {
                       <FormItem>
                         <FormLabel>State</FormLabel>
                         <FormControl>
-                          <Input placeholder="NY" {...field} />
+                          <Input placeholder="NY" {...field} value={field.value || ""} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -272,7 +274,7 @@ export default function Locations() {
                       <FormItem>
                         <FormLabel>ZIP Code</FormLabel>
                         <FormControl>
-                          <Input placeholder="10001" {...field} />
+                          <Input placeholder="10001" {...field} value={field.value || ""} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -288,7 +290,7 @@ export default function Locations() {
                       <FormItem>
                         <FormLabel>Phone</FormLabel>
                         <FormControl>
-                          <Input placeholder="(555) 123-4567" {...field} />
+                          <Input placeholder="(555) 123-4567" {...field} value={field.value || ""} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -301,7 +303,7 @@ export default function Locations() {
                       <FormItem>
                         <FormLabel>Email</FormLabel>
                         <FormControl>
-                          <Input placeholder="info@store.com" {...field} />
+                          <Input placeholder="info@store.com" {...field} value={field.value || ""} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -316,7 +318,7 @@ export default function Locations() {
                     <FormItem>
                       <FormLabel>Manager Name</FormLabel>
                       <FormControl>
-                        <Input placeholder="John Doe" {...field} />
+                        <Input placeholder="John Doe" {...field} value={field.value || ""} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -330,7 +332,7 @@ export default function Locations() {
                     <FormItem>
                       <FormLabel>Notes</FormLabel>
                       <FormControl>
-                        <Textarea placeholder="Additional notes..." {...field} />
+                        <Textarea placeholder="Additional notes..." {...field} value={field.value || ""} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -344,9 +346,9 @@ export default function Locations() {
                     <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
                       <div className="space-y-0.5">
                         <FormLabel className="text-base">Active</FormLabel>
-                        <FormDescription>
+                        <div className="text-sm text-muted-foreground">
                           Whether this location is currently active
-                        </FormDescription>
+                        </div>
                       </div>
                       <FormControl>
                         <Switch

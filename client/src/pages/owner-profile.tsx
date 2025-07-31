@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -57,9 +57,11 @@ export default function OwnerProfile() {
   });
 
   // Update form data when profile loads
-  if (profile && !formData.businessName) {
-    setFormData(profile);
-  }
+  useEffect(() => {
+    if (profile && !formData.businessName) {
+      setFormData(profile);
+    }
+  }, [profile]);
 
   const updateProfileMutation = useMutation({
     mutationFn: async (data: InsertBusinessProfile) => {
