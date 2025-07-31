@@ -26,7 +26,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { BusinessReportTemplate } from "@/components/business-report-template";
 import { AdvancedSettingsModal } from "@/components/advanced-settings-modal";
-import { useReactToPrint } from "react-to-print";
+// Removed react-to-print dependency - using native print instead
 import { type InsertBusinessProfile, type BusinessProfile } from "@shared/schema";
 
 export default function OwnerProfile() {
@@ -130,24 +130,74 @@ export default function OwnerProfile() {
     }
   };
 
-  const handlePrint = useReactToPrint({
-    content: () => reportRef.current,
-    documentTitle: `Business Report - ${profile?.businessName || "LeulNet"}`,
-    pageStyle: `
-      @page {
-        size: A4;
-        margin: 1in;
-      }
-      @media print {
-        body {
-          font-family: Arial, sans-serif;
-        }
-        .no-print {
-          display: none !important;
-        }
-      }
-    `,
-  });
+  const handlePrint = () => {
+    // Create a new window for printing
+    const printWindow = window.open('', '_blank', 'width=800,height=600');
+    if (!printWindow) {
+      toast({
+        title: "Error",
+        description: "Unable to open print window. Please check your popup blocker.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Get the report content
+    const reportContent = reportRef.current?.innerHTML || '';
+    
+    // Create the full HTML document for printing
+    const printDocument = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Business Report - ${profile?.businessName || "LeulNet"}</title>
+          <style>
+            @page {
+              size: A4;
+              margin: 1in;
+            }
+            body {
+              font-family: Arial, sans-serif;
+              margin: 0;
+              padding: 20px;
+              color: black;
+              background: white;
+            }
+            .no-print, .modal-overlay {
+              display: none !important;
+            }
+            .business-report-print {
+              width: 100%;
+              background: white !important;
+            }
+            /* Print-specific styles */
+            h1, h2, h3 { color: black !important; }
+            .text-gray-900 { color: black !important; }
+            .text-gray-600 { color: #666 !important; }
+            .text-gray-700 { color: #333 !important; }
+            .border-gray-200 { border-color: #ddd !important; }
+            .bg-gray-50 { background-color: #f9f9f9 !important; }
+            img { max-width: 100px; max-height: 100px; }
+          </style>
+        </head>
+        <body>
+          ${reportContent}
+        </body>
+      </html>
+    `;
+
+    // Write the document and print
+    printWindow.document.write(printDocument);
+    printWindow.document.close();
+    
+    // Wait for content to load, then print
+    printWindow.onload = () => {
+      setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+      }, 250);
+    };
+  };
 
   if (isLoading) {
     return (

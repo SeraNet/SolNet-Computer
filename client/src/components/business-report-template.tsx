@@ -9,7 +9,7 @@ export function BusinessReportTemplate({ profile }: BusinessReportTemplateProps)
   const currentDate = new Date().toLocaleDateString();
 
   return (
-    <div className="business-report-print bg-white p-8 max-w-4xl mx-auto">
+    <div className="business-report-print bg-white p-8 max-w-4xl mx-auto" style={{ color: 'black', background: 'white' }}>
       <style>{`
         @media print {
           body * {
