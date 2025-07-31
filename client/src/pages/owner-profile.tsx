@@ -26,6 +26,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { BusinessReportTemplate } from "@/components/business-report-template";
 import { AdvancedSettingsModal } from "@/components/advanced-settings-modal";
+import { useReactToPrint } from "react-to-print";
 import { type InsertBusinessProfile, type BusinessProfile } from "@shared/schema";
 
 export default function OwnerProfile() {
@@ -35,6 +36,7 @@ export default function OwnerProfile() {
   const [showReport, setShowReport] = useState(false);
   const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const reportRef = useRef<HTMLDivElement>(null);
 
   const { data: profile, isLoading } = useQuery<BusinessProfile>({
     queryKey: ["/api/business-profile"],
@@ -127,6 +129,25 @@ export default function OwnerProfile() {
       reader.readAsDataURL(file);
     }
   };
+
+  const handlePrint = useReactToPrint({
+    content: () => reportRef.current,
+    documentTitle: `Business Report - ${profile?.businessName || "LeulNet"}`,
+    pageStyle: `
+      @page {
+        size: A4;
+        margin: 1in;
+      }
+      @media print {
+        body {
+          font-family: Arial, sans-serif;
+        }
+        .no-print {
+          display: none !important;
+        }
+      }
+    `,
+  });
 
   if (isLoading) {
     return (
@@ -456,12 +477,12 @@ export default function OwnerProfile() {
 
       {/* Business Report Modal */}
       {showReport && profile && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 no-print">
-          <div className="bg-white rounded-lg p-6 max-w-6xl max-h-[90vh] overflow-auto">
-            <div className="flex justify-between items-center mb-4">
+        <div className="modal-overlay fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 no-print">
+          <div className="bg-white rounded-lg p-6 max-w-6xl max-h-[90vh] overflow-auto no-print">
+            <div className="flex justify-between items-center mb-4 no-print">
               <h2 className="text-2xl font-bold">Business Report</h2>
               <div className="space-x-2">
-                <Button onClick={() => window.print()} variant="default">
+                <Button onClick={handlePrint} variant="default">
                   Print Report
                 </Button>
                 <Button onClick={() => setShowReport(false)} variant="outline">
@@ -469,7 +490,9 @@ export default function OwnerProfile() {
                 </Button>
               </div>
             </div>
-            <BusinessReportTemplate profile={profile} />
+            <div ref={reportRef} className="print:p-0">
+              <BusinessReportTemplate profile={profile} />
+            </div>
           </div>
         </div>
       )}
