@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
@@ -27,7 +26,6 @@ import {
 import POSModal from "@/components/pos-modal";
 import ReceiptTemplate from "@/components/receipt-template";
 import { useState, useRef } from "react";
-import { useReactToPrint } from "react-to-print";
 
 const deviceRegistrationSchema = z.object({
   customerName: z.string().min(1, "Customer name is required"),
@@ -51,13 +49,66 @@ export default function Dashboard() {
   const [registeredDevice, setRegisteredDevice] = useState<any>(null);
   const receiptRef = useRef<HTMLDivElement>(null);
 
-  const handlePrint = useReactToPrint({
-    content: () => receiptRef.current,
-    documentTitle: `Device Registration Receipt`,
-    onAfterPrint: () => {
-      setRegisteredDevice(null);
-    },
-  });
+  const handlePrint = () => {
+    // Create a new window for printing the receipt
+    const printWindow = window.open('', '_blank', 'width=600,height=800');
+    if (!printWindow) {
+      toast({
+        title: "Error",
+        description: "Unable to open print window. Please check your popup blocker.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Get the receipt content
+    const receiptContent = receiptRef.current?.innerHTML || '';
+    
+    // Create the full HTML document for printing
+    const printDocument = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Device Registration Receipt</title>
+          <style>
+            @page {
+              size: A4;
+              margin: 0.5in;
+            }
+            body {
+              font-family: Arial, sans-serif;
+              margin: 0;
+              padding: 20px;
+              color: black;
+              background: white;
+            }
+            h1, h2, h3 { color: black !important; }
+            .text-gray-900 { color: black !important; }
+            .text-gray-600 { color: #666 !important; }
+            .text-gray-700 { color: #333 !important; }
+            .border-gray-200 { border-color: #ddd !important; }
+            .bg-gray-50 { background-color: #f9f9f9 !important; }
+          </style>
+        </head>
+        <body>
+          ${receiptContent}
+        </body>
+      </html>
+    `;
+
+    // Write the document and print
+    printWindow.document.write(printDocument);
+    printWindow.document.close();
+    
+    // Wait for content to load, then print
+    printWindow.onload = () => {
+      setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+        setRegisteredDevice(null);
+      }, 250);
+    };
+  };
 
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ["/api/dashboard/stats"],
@@ -105,28 +156,46 @@ export default function Dashboard() {
 
   const registerDeviceMutation = useMutation({
     mutationFn: async (data: DeviceRegistrationForm) => {
-      // First create or find customer
-      const customerResponse = await apiRequest("POST", "/api/customers", {
-        name: data.customerName,
-        phone: data.customerPhone,
-        email: data.customerEmail || null,
-      });
-      const customer = await customerResponse.json();
+      console.log('Starting device registration with data:', data);
 
-      // Then create device
-      const deviceResponse = await apiRequest("POST", "/api/devices", {
-        customerId: customer.id,
-        deviceTypeId: data.deviceTypeId,
-        brandId: data.brandId,
-        modelId: data.modelId || null,
-        serialNumber: data.serialNumber || null,
-        problemDescription: data.problemDescription,
-        serviceTypeId: data.serviceTypeId,
-        priority: data.priority,
-        status: "registered",
-      });
-      
-      const device = await deviceResponse.json();
+      // First create or find customer
+      let customer;
+      try {
+        const customerResponse = await apiRequest("POST", "/api/customers", {
+          name: data.customerName,
+          phone: data.customerPhone,
+          email: data.customerEmail || null,
+        });
+        customer = await customerResponse.json();
+        console.log('Customer created/found:', customer);
+      } catch (error) {
+        console.error('Customer creation failed:', error);
+        throw new Error('Failed to create customer');
+      }
+
+      // Then create device with customer ID
+      let device;
+      try {
+        const devicePayload = {
+          customerId: customer.id,
+          deviceTypeId: data.deviceTypeId,
+          brandId: data.brandId,
+          modelId: data.modelId || null,
+          serialNumber: data.serialNumber || null,
+          problemDescription: data.problemDescription,
+          serviceTypeId: data.serviceTypeId,
+          priority: data.priority,
+          status: "registered",
+        };
+        console.log('Creating device with payload:', devicePayload);
+        
+        const deviceResponse = await apiRequest("POST", "/api/devices", devicePayload);
+        device = await deviceResponse.json();
+        console.log('Device created:', device);
+      } catch (error) {
+        console.error('Device creation failed:', error);
+        throw new Error('Failed to create device');
+      }
       
       // Get reference data for receipt
       const deviceType = deviceTypes.find(dt => dt.id === data.deviceTypeId);
@@ -170,146 +239,98 @@ export default function Dashboard() {
       }, 500);
     },
     onError: (error) => {
+      console.error('Registration error:', error);
       toast({
         title: "Registration Failed",
-        description: error.message,
+        description: error.message || "Failed to register device. Please try again.",
         variant: "destructive",
       });
     },
   });
 
   const onSubmit = (data: DeviceRegistrationForm) => {
+    console.log('Form submitted with data:', data);
     registerDeviceMutation.mutate(data);
   };
 
-  const getStatusBadgeClass = (status: string) => {
-    switch (status) {
-      case "registered": return "status-registered";
-      case "diagnosed": return "status-diagnosed";
-      case "in_progress": return "status-in_progress";
-      case "waiting_parts": return "status-waiting_parts";
-      case "completed": return "status-completed";
-      case "ready_for_pickup": return "status-ready_for_pickup";
-      case "delivered": return "status-delivered";
-      case "cancelled": return "status-cancelled";
-      default: return "status-registered";
-    }
-  };
-
-  const formatStatus = (status: string) => {
-    return status.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
-  };
-
-  return (
-    <>
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-          <p className="mt-1 text-sm text-gray-600">
-            Welcome back! Here's what's happening in your shop today.
-          </p>
-        </div>
-        <div className="flex space-x-3">
-          <Button variant="outline">
-            <Plus className="mr-2 h-4 w-4" />
-            Quick Register
-          </Button>
-          <Button onClick={() => setShowPOSModal(true)}>
-            <ShoppingCart className="mr-2 h-4 w-4" />
-            New Sale
-          </Button>
+  if (statsLoading || repairsLoading || lowStockLoading || salesLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          {[1, 2, 3, 4].map((i) => (
+            <Card key={i}>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <Skeleton className="h-4 w-[100px]" />
+                <Skeleton className="h-4 w-4" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-8 w-[60px] mb-2" />
+                <Skeleton className="h-3 w-[120px]" />
+              </CardContent>
+            </Card>
+          ))}
         </div>
       </div>
+    );
+  }
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+  return (
+    <div className="space-y-6">
+      {/* Stats Overview */}
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
-          <CardContent className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="bg-blue-500 p-3 rounded-lg">
-                  <Laptop className="h-6 w-6 text-white" />
-                </div>
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">Active Repairs</dt>
-                  <dd className="text-2xl font-bold text-gray-900">
-                    {statsLoading ? <Skeleton className="h-8 w-16" /> : stats?.activeRepairs || 0}
-                  </dd>
-                </dl>
-              </div>
-            </div>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active Repairs</CardTitle>
+            <Laptop className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats?.activeRepairs || 0}</div>
+            <p className="text-xs text-muted-foreground">Devices in progress</p>
           </CardContent>
         </Card>
-
+        
         <Card>
-          <CardContent className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="bg-green-500 p-3 rounded-lg">
-                  <CheckCircle className="h-6 w-6 text-white" />
-                </div>
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">Completed Today</dt>
-                  <dd className="text-2xl font-bold text-gray-900">
-                    {statsLoading ? <Skeleton className="h-8 w-16" /> : stats?.completedToday || 0}
-                  </dd>
-                </dl>
-              </div>
-            </div>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Completed Today</CardTitle>
+            <CheckCircle className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats?.completedToday || 0}</div>
+            <p className="text-xs text-muted-foreground">Repairs finished</p>
           </CardContent>
         </Card>
-
+        
         <Card>
-          <CardContent className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="bg-yellow-500 p-3 rounded-lg">
-                  <AlertTriangle className="h-6 w-6 text-white" />
-                </div>
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">Low Stock Items</dt>
-                  <dd className="text-2xl font-bold text-gray-900">
-                    {statsLoading ? <Skeleton className="h-8 w-16" /> : stats?.lowStockItems || 0}
-                  </dd>
-                </dl>
-              </div>
-            </div>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Low Stock Alert</CardTitle>
+            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{lowStockItems.length}</div>
+            <p className="text-xs text-muted-foreground">Items need restocking</p>
           </CardContent>
         </Card>
-
+        
         <Card>
-          <CardContent className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="bg-purple-500 p-3 rounded-lg">
-                  <DollarSign className="h-6 w-6 text-white" />
-                </div>
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">Today's Revenue</dt>
-                  <dd className="text-2xl font-bold text-gray-900">
-                    {statsLoading ? <Skeleton className="h-8 w-16" /> : `$${stats?.todayRevenue || 0}`}
-                  </dd>
-                </dl>
-              </div>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Today's Revenue</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              ${recentSales.reduce((sum: number, sale: any) => sum + parseFloat(sale.totalAmount || 0), 0).toFixed(2)}
             </div>
+            <p className="text-xs text-muted-foreground">Sales revenue</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Main Content Grid */}
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-2 mb-8">
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
         {/* Device Registration Form */}
         <Card>
           <CardHeader>
-            <CardTitle>Device Registration</CardTitle>
+            <CardTitle>Quick Register</CardTitle>
             <p className="text-sm text-gray-600">Register a new device for repair</p>
           </CardHeader>
           <CardContent>
@@ -345,21 +366,35 @@ export default function Dashboard() {
                   />
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <FormField
+                  control={form.control}
+                  name="customerEmail"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email (Optional)</FormLabel>
+                      <FormControl>
+                        <Input type="email" placeholder="Enter email address" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <FormField
                     control={form.control}
                     name="deviceTypeId"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Device Type</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder="Select type" />
+                              <SelectValue placeholder="Select device type" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {deviceTypes?.map((type: any) => (
+                            {deviceTypes.map((type: any) => (
                               <SelectItem key={type.id} value={type.id}>
                                 {type.name}
                               </SelectItem>
@@ -377,14 +412,14 @@ export default function Dashboard() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Brand</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Select brand" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {brands?.map((brand: any) => (
+                            {brands.map((brand: any) => (
                               <SelectItem key={brand.id} value={brand.id}>
                                 {brand.name}
                               </SelectItem>
@@ -395,21 +430,32 @@ export default function Dashboard() {
                       </FormItem>
                     )}
                   />
-
-                  <FormField
-                    control={form.control}
-                    name="serialNumber"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Serial Number</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Enter serial number" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
                 </div>
+
+                <FormField
+                  control={form.control}
+                  name="serviceTypeId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Service Type</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select service type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {serviceTypes.map((service: any) => (
+                            <SelectItem key={service.id} value={service.id}>
+                              {service.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
                 <FormField
                   control={form.control}
@@ -418,10 +464,10 @@ export default function Dashboard() {
                     <FormItem>
                       <FormLabel>Problem Description</FormLabel>
                       <FormControl>
-                        <Textarea
-                          rows={3}
-                          placeholder="Describe the issue..."
-                          {...field}
+                        <Textarea 
+                          placeholder="Describe the problem with the device"
+                          className="min-h-[80px]"
+                          {...field} 
                         />
                       </FormControl>
                       <FormMessage />
@@ -429,58 +475,8 @@ export default function Dashboard() {
                   )}
                 />
 
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <FormField
-                    control={form.control}
-                    name="serviceTypeId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Service Type</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select service" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {serviceTypes?.map((service: any) => (
-                              <SelectItem key={service.id} value={service.id}>
-                                {service.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="priority"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Priority</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select priority" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="normal">Normal</SelectItem>
-                            <SelectItem value="high">High</SelectItem>
-                            <SelectItem value="urgent">Urgent</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
                 <div className="flex justify-end space-x-3">
-                  <Button type="button" variant="outline">
+                  <Button type="button" variant="outline" onClick={() => form.reset()}>
                     Cancel
                   </Button>
                   <Button 
@@ -495,235 +491,86 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Active Repairs List */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Active Repairs</CardTitle>
-                <p className="text-sm text-gray-600">Current devices being serviced</p>
-              </div>
-              <Button variant="link" size="sm">
-                View All
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {repairsLoading ? (
-                Array.from({ length: 3 }).map((_, i) => (
-                  <div key={i} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                    <div className="flex items-center">
-                      <Skeleton className="h-10 w-10 rounded-lg" />
-                      <div className="ml-4">
-                        <Skeleton className="h-4 w-32 mb-1" />
-                        <Skeleton className="h-3 w-24 mb-1" />
-                        <Skeleton className="h-3 w-20" />
-                      </div>
-                    </div>
-                    <Skeleton className="h-6 w-20 rounded-full" />
-                  </div>
-                ))
-              ) : activeRepairs?.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  <Laptop className="mx-auto h-12 w-12 text-gray-300 mb-2" />
-                  <p>No active repairs</p>
-                </div>
+        {/* Recent Activity */}
+        <div className="space-y-6">
+          {/* Active Repairs */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Active Repairs</CardTitle>
+              <p className="text-sm text-gray-600">Current devices being serviced</p>
+            </CardHeader>
+            <CardContent>
+              {activeRepairs.length === 0 ? (
+                <p className="text-sm text-gray-500 text-center py-4">No active repairs</p>
               ) : (
-                activeRepairs?.map((repair: any) => (
-                  <div key={repair.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0">
-                        <div className="h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                          <Laptop className="h-5 w-5 text-blue-600" />
-                        </div>
+                <div className="space-y-3">
+                  {activeRepairs.slice(0, 5).map((repair: any) => (
+                    <div key={repair.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div className="flex-1">
+                        <p className="font-medium text-sm">{repair.customerName}</p>
+                        <p className="text-xs text-gray-600">{repair.deviceType} - {repair.brand}</p>
                       </div>
-                      <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900">
-                          {repair.brand} {repair.deviceType}
-                        </div>
-                        <div className="text-sm text-gray-500">{repair.customerName}</div>
-                        <div className="text-xs text-gray-400">
-                          Registered {new Date(repair.createdAt).toLocaleDateString()}
-                        </div>
-                      </div>
+                      <Badge variant="secondary" className="text-xs">
+                        {repair.status?.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
+                      </Badge>
                     </div>
-                    <Badge className={getStatusBadgeClass(repair.status)}>
-                      {formatStatus(repair.status)}
-                    </Badge>
-                  </div>
-                ))
+                  ))}
+                </div>
               )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
 
-      {/* Secondary Content Grid */}
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-        {/* Quick Actions */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-4">
-              <Button
-                variant="outline"
-                className="flex flex-col items-center p-4 h-auto"
-                onClick={() => setShowPOSModal(true)}
-              >
-                <ShoppingCart className="h-8 w-8 text-primary mb-2" />
-                <span className="text-sm font-medium">Point of Sale</span>
-              </Button>
-              
-              <Button
-                variant="outline"
-                className="flex flex-col items-center p-4 h-auto"
-              >
-                <Plus className="h-8 w-8 text-green-500 mb-2" />
-                <span className="text-sm font-medium">Add Item</span>
-              </Button>
-              
-              <Button
-                variant="outline"
-                className="flex flex-col items-center p-4 h-auto"
-              >
-                <Calendar className="h-8 w-8 text-blue-500 mb-2" />
-                <span className="text-sm font-medium">Schedule</span>
-              </Button>
-              
-              <Button
-                variant="outline"
-                className="flex flex-col items-center p-4 h-auto"
-              >
-                <BarChart3 className="h-8 w-8 text-purple-500 mb-2" />
-                <span className="text-sm font-medium">Reports</span>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Low Stock Alert */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center">
-              <AlertTriangle className="h-5 w-5 text-yellow-500 mr-2" />
+          {/* Low Stock Items */}
+          <Card>
+            <CardHeader>
               <CardTitle>Low Stock Alert</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {lowStockLoading ? (
-                Array.from({ length: 3 }).map((_, i) => (
-                  <div key={i} className="flex items-center justify-between">
-                    <div>
-                      <Skeleton className="h-4 w-24 mb-1" />
-                      <Skeleton className="h-3 w-20" />
-                    </div>
-                    <div className="text-right">
-                      <Skeleton className="h-4 w-16 mb-1" />
-                      <Skeleton className="h-3 w-12" />
-                    </div>
-                  </div>
-                ))
-              ) : lowStockItems?.length === 0 ? (
-                <div className="text-center py-4 text-gray-500">
-                  <p className="text-sm">All items are well stocked</p>
-                </div>
+              <p className="text-sm text-gray-600">Items that need restocking</p>
+            </CardHeader>
+            <CardContent>
+              {lowStockItems.length === 0 ? (
+                <p className="text-sm text-gray-500 text-center py-4">All items well stocked</p>
               ) : (
-                lowStockItems?.map((item: any) => (
-                  <div key={item.id} className="flex items-center justify-between">
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">{item.name}</div>
-                      <div className="text-xs text-gray-500">SKU: {item.sku}</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-sm font-medium text-red-600">{item.quantity} left</div>
-                      <div className="text-xs text-gray-500">Min: {item.minStockLevel}</div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-            {lowStockItems?.length > 0 && (
-              <div className="mt-4">
-                <Button className="w-full bg-yellow-600 hover:bg-yellow-700">
-                  Reorder All
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Recent Sales */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Sales</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {salesLoading ? (
-                Array.from({ length: 3 }).map((_, i) => (
-                  <div key={i} className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <Skeleton className="h-8 w-8 rounded-full" />
-                      <div className="ml-3">
-                        <Skeleton className="h-4 w-24 mb-1" />
-                        <Skeleton className="h-3 w-20" />
+                <div className="space-y-3">
+                  {lowStockItems.slice(0, 5).map((item: any) => (
+                    <div key={item.id} className="flex items-center justify-between p-3 bg-red-50 rounded-lg">
+                      <div className="flex-1">
+                        <p className="font-medium text-sm">{item.name}</p>
+                        <p className="text-xs text-gray-600">{item.category}</p>
                       </div>
+                      <Badge variant="destructive" className="text-xs">
+                        {item.quantity} left
+                      </Badge>
                     </div>
-                    <div className="text-right">
-                      <Skeleton className="h-4 w-16 mb-1" />
-                      <Skeleton className="h-3 w-12" />
-                    </div>
-                  </div>
-                ))
-              ) : recentSales?.length === 0 ? (
-                <div className="text-center py-4 text-gray-500">
-                  <ShoppingCart className="mx-auto h-8 w-8 text-gray-300 mb-2" />
-                  <p className="text-sm">No sales today</p>
+                  ))}
                 </div>
-              ) : (
-                recentSales?.map((sale: any) => (
-                  <div key={sale.id} className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0">
-                        <div className="h-8 w-8 bg-green-100 rounded-full flex items-center justify-center">
-                          <ShoppingCart className="h-4 w-4 text-green-600" />
-                        </div>
-                      </div>
-                      <div className="ml-3">
-                        <div className="text-sm font-medium text-gray-900">Sale #{sale.id.slice(-6)}</div>
-                        <div className="text-xs text-gray-500">
-                          Customer: {sale.customerName || "Walk-in"}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-sm font-medium text-gray-900">
-                        ${sale.totalAmount}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {new Date(sale.createdAt).toLocaleTimeString()}
-                      </div>
-                    </div>
-                  </div>
-                ))
               )}
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
-      <POSModal open={showPOSModal} onOpenChange={setShowPOSModal} />
-
-      {/* Hidden Receipt Template for Printing */}
-      {registeredDevice && (
-        <div className="print-hidden">
-          <ReceiptTemplate ref={receiptRef} data={registeredDevice} />
+      {/* Hidden Receipt Template */}
+      <div style={{ display: 'none' }}>
+        <div ref={receiptRef}>
+          {registeredDevice && (
+            <ReceiptTemplate 
+              receiptData={{
+                receiptNumber: registeredDevice.receiptNumber,
+                date: registeredDevice.date,
+                customer: registeredDevice.customer,
+                device: registeredDevice.device,
+                type: 'registration'
+              }}
+            />
+          )}
         </div>
-      )}
-    </>
+      </div>
+
+      {/* POS Modal */}
+      <POSModal 
+        isOpen={showPOSModal} 
+        onClose={() => setShowPOSModal(false)} 
+      />
+    </div>
   );
 }
