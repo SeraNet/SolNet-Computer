@@ -27,14 +27,14 @@ import {
   Clock,
   DollarSign
 } from "lucide-react";
-import { type InsertBusinessProfile } from "@shared/schema";
+import { type InsertBusinessProfile, type BusinessProfile } from "@shared/schema";
 
 export default function OwnerProfile() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("general");
 
-  const { data: profile, isLoading } = useQuery({
+  const { data: profile, isLoading } = useQuery<BusinessProfile>({
     queryKey: ["/api/business-profile"],
   });
 
@@ -59,9 +59,30 @@ export default function OwnerProfile() {
   // Update form data when profile loads
   useEffect(() => {
     if (profile && !formData.businessName) {
-      setFormData(profile);
+      setFormData({
+        businessName: profile.businessName || "",
+        ownerName: profile.ownerName || "",
+        email: profile.email || "",
+        phone: profile.phone || "",
+        address: profile.address || "",
+        city: profile.city || "",
+        state: profile.state || "",
+        zipCode: profile.zipCode || "",
+        country: profile.country || "USA",
+        website: profile.website || "",
+        logo: profile.logo || "",
+        taxId: profile.taxId || "",
+        licenseNumber: profile.licenseNumber || "",
+        businessType: profile.businessType || "Computer Repair Shop",
+        description: profile.description || "",
+        workingHours: profile.workingHours as any,
+        socialLinks: profile.socialLinks as any,
+        bankingInfo: profile.bankingInfo as any,
+        insuranceInfo: profile.insuranceInfo as any,
+        certifications: profile.certifications as any,
+      });
     }
-  }, [profile]);
+  }, [profile, formData.businessName]);
 
   const updateProfileMutation = useMutation({
     mutationFn: async (data: InsertBusinessProfile) => {
