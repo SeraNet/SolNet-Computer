@@ -13,6 +13,7 @@ import {
   deviceStatusHistory,
   locations,
   businessProfile,
+  expenses,
   type User,
   type InsertUser,
   type Customer,
@@ -39,6 +40,8 @@ import {
   type InsertLocation,
   type BusinessProfile,
   type InsertBusinessProfile,
+  type Expense,
+  type InsertExpense,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, like, and, gte, lte, count, sql } from "drizzle-orm";
@@ -126,6 +129,19 @@ export interface IStorage {
   getInventoryPredictions(): Promise<any[]>;
   getStockAlerts(): Promise<any[]>;
   updateInventoryPredictions(): Promise<void>;
+
+  // Expenses
+  getExpenses(): Promise<Expense[]>;
+  getExpense(id: string): Promise<Expense | undefined>;
+  createExpense(expense: InsertExpense): Promise<Expense>;
+  updateExpense(id: string, updates: Partial<InsertExpense>): Promise<Expense>;
+  getExpenseStats(): Promise<any>;
+
+  // Loan Invoices
+  getLoanInvoices(): Promise<any[]>;
+  getLoanInvoice(id: string): Promise<any>;
+  createLoanInvoice(invoice: any): Promise<any>;
+  updateLoanInvoice(id: string, updates: any): Promise<any>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1414,6 +1430,107 @@ export class DatabaseStorage implements IStorage {
         })
         .where(eq(inventoryItems.id, item.id));
     }
+  }
+
+  // Expenses
+  async getExpenses(): Promise<Expense[]> {
+    return await db.select().from(expenses).orderBy(desc(expenses.expenseDate));
+  }
+
+  async getExpense(id: string): Promise<Expense | undefined> {
+    const [expense] = await db.select().from(expenses).where(eq(expenses.id, id));
+    return expense;
+  }
+
+  async createExpense(insertExpense: InsertExpense): Promise<Expense> {
+    const [expense] = await db.insert(expenses).values(insertExpense).returning();
+    return expense;
+  }
+
+  async updateExpense(id: string, updates: Partial<InsertExpense>): Promise<Expense> {
+    const [expense] = await db
+      .update(expenses)
+      .set(updates)
+      .where(eq(expenses.id, id))
+      .returning();
+    return expense;
+  }
+
+  async getExpenseStats(): Promise<any> {
+    const now = new Date();
+    const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const thisYear = new Date(now.getFullYear(), 0, 1);
+    
+    // Current month total
+    const [monthlyTotal] = await db
+      .select({ total: sql<number>`COALESCE(SUM(${expenses.amount}), 0)` })
+      .from(expenses)
+      .where(gte(expenses.expenseDate, thisMonth));
+
+    // Last month total for comparison
+    const [lastMonthTotal] = await db
+      .select({ total: sql<number>`COALESCE(SUM(${expenses.amount}), 0)` })
+      .from(expenses)
+      .where(and(
+        gte(expenses.expenseDate, lastMonth),
+        lte(expenses.expenseDate, thisMonth)
+      ));
+
+    // Year total
+    const [yearlyTotal] = await db
+      .select({ total: sql<number>`COALESCE(SUM(${expenses.amount}), 0)` })
+      .from(expenses)
+      .where(gte(expenses.expenseDate, thisYear));
+
+    // Total expenses count
+    const [totalExpenses] = await db
+      .select({ count: count() })
+      .from(expenses);
+
+    // Top category
+    const topCategory = await db
+      .select({
+        category: expenses.category,
+        total: sql<number>`SUM(${expenses.amount})`,
+      })
+      .from(expenses)
+      .where(gte(expenses.expenseDate, thisYear))
+      .groupBy(expenses.category)
+      .orderBy(sql`SUM(${expenses.amount}) DESC`)
+      .limit(1);
+
+    const monthlyChange = lastMonthTotal.total > 0 
+      ? ((monthlyTotal.total - lastMonthTotal.total) / lastMonthTotal.total * 100).toFixed(1)
+      : "0";
+
+    return {
+      monthlyTotal: monthlyTotal.total.toFixed(2),
+      monthlyChange,
+      yearlyTotal: yearlyTotal.total.toFixed(2),
+      totalExpenses: totalExpenses.count,
+      topCategory: topCategory[0]?.category || "N/A",
+      topCategoryAmount: topCategory[0]?.total?.toFixed(2) || "0.00",
+      averageMonthly: (yearlyTotal.total / 12).toFixed(2),
+    };
+  }
+
+  // Loan Invoices (simplified implementation)
+  async getLoanInvoices(): Promise<any[]> {
+    // For now, return mock data since we need a proper loan_invoices table
+    return [];
+  }
+
+  async getLoanInvoice(id: string): Promise<any> {
+    return null;
+  }
+
+  async createLoanInvoice(invoice: any): Promise<any> {
+    return { ...invoice, id: `invoice_${Date.now()}` };
+  }
+
+  async updateLoanInvoice(id: string, updates: any): Promise<any> {
+    return { id, ...updates };
   }
 }
 

@@ -15,6 +15,7 @@ import {
   insertLocationSchema,
   insertUserSchema,
   insertBusinessProfileSchema,
+  insertExpenseSchema,
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -956,6 +957,112 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       console.error("Error creating service type:", error);
       res.status(500).json({ message: "Failed to create service type" });
+    }
+  });
+
+  // Expenses
+  app.get("/api/expenses", async (req, res) => {
+    try {
+      const expenses = await storage.getExpenses();
+      res.json(expenses);
+    } catch (error) {
+      console.error("Error fetching expenses:", error);
+      res.status(500).json({ message: "Failed to fetch expenses" });
+    }
+  });
+
+  app.get("/api/expenses/stats", async (req, res) => {
+    try {
+      const stats = await storage.getExpenseStats();
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching expense stats:", error);
+      res.status(500).json({ message: "Failed to fetch expense stats" });
+    }
+  });
+
+  app.get("/api/expenses/:id", async (req, res) => {
+    try {
+      const expense = await storage.getExpense(req.params.id);
+      if (!expense) {
+        return res.status(404).json({ message: "Expense not found" });
+      }
+      res.json(expense);
+    } catch (error) {
+      console.error("Error fetching expense:", error);
+      res.status(500).json({ message: "Failed to fetch expense" });
+    }
+  });
+
+  app.post("/api/expenses", async (req, res) => {
+    try {
+      const expenseData = insertExpenseSchema.parse(req.body);
+      const expense = await storage.createExpense(expenseData);
+      res.status(201).json(expense);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid expense data", errors: error.errors });
+      }
+      console.error("Error creating expense:", error);
+      res.status(500).json({ message: "Failed to create expense" });
+    }
+  });
+
+  app.put("/api/expenses/:id", async (req, res) => {
+    try {
+      const updates = insertExpenseSchema.partial().parse(req.body);
+      const expense = await storage.updateExpense(req.params.id, updates);
+      res.json(expense);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid expense data", errors: error.errors });
+      }
+      console.error("Error updating expense:", error);
+      res.status(500).json({ message: "Failed to update expense" });
+    }
+  });
+
+  // Loan Invoices (basic implementation)
+  app.get("/api/loan-invoices", async (req, res) => {
+    try {
+      const invoices = await storage.getLoanInvoices();
+      res.json(invoices);
+    } catch (error) {
+      console.error("Error fetching loan invoices:", error);
+      res.status(500).json({ message: "Failed to fetch loan invoices" });
+    }
+  });
+
+  app.get("/api/loan-invoices/:id", async (req, res) => {
+    try {
+      const invoice = await storage.getLoanInvoice(req.params.id);
+      if (!invoice) {
+        return res.status(404).json({ message: "Loan invoice not found" });
+      }
+      res.json(invoice);
+    } catch (error) {
+      console.error("Error fetching loan invoice:", error);
+      res.status(500).json({ message: "Failed to fetch loan invoice" });
+    }
+  });
+
+  app.post("/api/loan-invoices", async (req, res) => {
+    try {
+      const invoice = await storage.createLoanInvoice(req.body);
+      res.status(201).json(invoice);
+    } catch (error) {
+      console.error("Error creating loan invoice:", error);
+      res.status(500).json({ message: "Failed to create loan invoice" });
+    }
+  });
+
+  app.put("/api/loan-invoices/:id", async (req, res) => {
+    try {
+      const invoice = await storage.updateLoanInvoice(req.params.id, req.body);
+      res.json(invoice);
+    } catch (error) {
+      console.error("Error updating loan invoice:", error);
+      res.status(500).json({ message: "Failed to update loan invoice" });
     }
   });
 
