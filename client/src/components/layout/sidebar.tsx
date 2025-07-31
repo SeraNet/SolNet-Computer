@@ -16,28 +16,36 @@ import {
   DollarSign
 } from "lucide-react";
 import { LocationSelector } from "@/components/LocationSelector";
+import { useAuth } from "@/hooks/useAuth";
 
+// Navigation items with role-based access control
 const navigationItems = [
-  { name: "Dashboard", href: "/", icon: LayoutDashboard },
-  { name: "Device Registration", href: "/device-registration", icon: LaptopMinimal },
-  { name: "Repair Tracking", href: "/repair-tracking", icon: Wrench },
-  { name: "Point of Sale", href: "/point-of-sale", icon: ShoppingCart },
-  { name: "Inventory", href: "/inventory", icon: Package },
-  { name: "Smart Predictions", href: "/inventory-predictions", icon: TrendingUp },
-  { name: "Customers", href: "/customers", icon: Users },
-  { name: "Appointments", href: "/appointments", icon: Calendar },
-  { name: "Analytics", href: "/analytics", icon: BarChart3 },
-  { name: "Expenses", href: "/expenses", icon: DollarSign },
-  { name: "Loan Invoices", href: "/loan-invoices", icon: Receipt },
-  { name: "Workers", href: "/workers", icon: Users },
-  { name: "Service Management", href: "/service-management", icon: Settings },
-  { name: "Locations", href: "/locations", icon: MapPin },
-  { name: "Owner Profile", href: "/owner-profile", icon: User },
-  { name: "Settings", href: "/settings", icon: Settings },
+  { name: "Dashboard", href: "/", icon: LayoutDashboard, roles: ["admin", "technician", "sales"] },
+  { name: "Device Registration", href: "/device-registration", icon: LaptopMinimal, roles: ["admin", "technician"] },
+  { name: "Repair Tracking", href: "/repair-tracking", icon: Wrench, roles: ["admin", "technician"] },
+  { name: "Point of Sale", href: "/point-of-sale", icon: ShoppingCart, roles: ["admin", "sales"] },
+  { name: "Inventory", href: "/inventory", icon: Package, roles: ["admin", "technician", "sales"] },
+  { name: "Smart Predictions", href: "/inventory-predictions", icon: TrendingUp, roles: ["admin"] },
+  { name: "Customers", href: "/customers", icon: Users, roles: ["admin", "technician", "sales"] },
+  { name: "Appointments", href: "/appointments", icon: Calendar, roles: ["admin", "technician", "sales"] },
+  { name: "Analytics", href: "/analytics", icon: BarChart3, roles: ["admin"] },
+  { name: "Expenses", href: "/expenses", icon: DollarSign, roles: ["admin"] },
+  { name: "Loan Invoices", href: "/loan-invoices", icon: Receipt, roles: ["admin", "sales"] },
+  { name: "Workers", href: "/workers", icon: Users, roles: ["admin"] },
+  { name: "Service Management", href: "/service-management", icon: Settings, roles: ["admin"] },
+  { name: "Locations", href: "/locations", icon: MapPin, roles: ["admin"] },
+  { name: "Owner Profile", href: "/owner-profile", icon: User, roles: ["admin"] },
+  { name: "Settings", href: "/settings", icon: Settings, roles: ["admin"] },
 ];
 
 export default function Sidebar() {
   const [location] = useLocation();
+  const { user, hasRole } = useAuth();
+
+  // Filter navigation items based on user role
+  const visibleItems = navigationItems.filter(item => 
+    !item.roles || hasRole(item.roles)
+  );
 
   return (
     <div className="hidden md:flex md:w-64 md:flex-col">
@@ -49,7 +57,9 @@ export default function Sidebar() {
             </div>
             <div className="ml-3">
               <h1 className="text-xl font-bold text-gray-900">LeulNet</h1>
-              <p className="text-sm text-gray-500">Computer Management</p>
+              <p className="text-sm text-gray-500">
+                {user?.role ? `${user.role.charAt(0).toUpperCase() + user.role.slice(1)} Panel` : 'Computer Management'}
+              </p>
             </div>
           </div>
         </div>
@@ -60,7 +70,7 @@ export default function Sidebar() {
         
         <div className="mt-8 flex-grow flex flex-col">
           <nav className="flex-1 px-4 space-y-2">
-            {navigationItems.map((item) => {
+            {visibleItems.map((item) => {
               const isActive = location === item.href;
               const Icon = item.icon;
               
@@ -90,8 +100,12 @@ export default function Sidebar() {
             <div className="flex items-center">
               <div className="inline-block h-9 w-9 rounded-full bg-gray-300"></div>
               <div className="ml-3">
-                <p className="text-sm font-medium text-gray-700">Admin User</p>
-                <p className="text-xs font-medium text-gray-500">Administrator</p>
+                <p className="text-sm font-medium text-gray-700">
+                  {user?.firstName || user?.username || 'User'}
+                </p>
+                <p className="text-xs font-medium text-gray-500">
+                  {user?.role?.charAt(0).toUpperCase() + user?.role?.slice(1) || 'Role'}
+                </p>
               </div>
             </div>
           </div>

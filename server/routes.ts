@@ -20,6 +20,119 @@ import {
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Public API endpoints (no authentication required)
+  app.get("/api/public/business-info", async (req, res) => {
+    try {
+      const profile = await storage.getBusinessProfile();
+      res.json(profile);
+    } catch (error) {
+      console.error("Error fetching business profile:", error);
+      res.status(500).json({ message: "Failed to fetch business info" });
+    }
+  });
+
+  app.get("/api/public/services", async (req, res) => {
+    try {
+      const services = await storage.getServiceTypes();
+      res.json(services);
+    } catch (error) {
+      console.error("Error fetching services:", error);
+      res.status(500).json({ message: "Failed to fetch services" });
+    }
+  });
+
+  app.get("/api/public/track-device/:code", async (req, res) => {
+    try {
+      const device = await storage.getDeviceByCode(req.params.code);
+      if (!device) {
+        return res.status(404).json({ error: "Device not found" });
+      }
+      
+      // Return only public-safe information
+      res.json({
+        customerName: device.customerName,
+        deviceDescription: device.deviceDescription,
+        status: device.status,
+        updatedAt: device.updatedAt,
+      });
+    } catch (error) {
+      console.error("Error tracking device:", error);
+      res.status(404).json({ error: "Device not found" });
+    }
+  });
+
+  // Authentication endpoints
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const { username, password } = req.body;
+      
+      if (!username || !password) {
+        return res.status(400).json({ message: "Username and password are required" });
+      }
+
+      const user = await storage.authenticateUser(username, password);
+      if (!user) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      if (!user.isActive) {
+        return res.status(401).json({ message: "Account is deactivated" });
+      }
+
+      // Generate a simple token (in production, use JWT)
+      const token = Buffer.from(`${user.id}:${Date.now()}`).toString('base64');
+      
+      res.json({
+        user: {
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          role: user.role,
+          locationId: user.locationId,
+          isActive: user.isActive,
+        },
+        token,
+      });
+    } catch (error) {
+      console.error("Error during login:", error);
+      res.status(500).json({ message: "Login failed" });
+    }
+  });
+
+  app.get("/api/auth/verify", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.replace('Bearer ', '');
+      if (!token) {
+        return res.status(401).json({ message: "No token provided" });
+      }
+
+      // Simple token verification (in production, use proper JWT verification)
+      const decoded = Buffer.from(token, 'base64').toString();
+      const [userId] = decoded.split(':');
+      
+      const user = await storage.getUser(userId);
+      if (!user || !user.isActive) {
+        return res.status(401).json({ message: "Invalid token" });
+      }
+
+      res.json({
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+        locationId: user.locationId,
+        isActive: user.isActive,
+      });
+    } catch (error) {
+      console.error("Error verifying token:", error);
+      res.status(401).json({ message: "Invalid token" });
+    }
+  });
+
   // Locations
   app.get("/api/locations", async (req, res) => {
     try {

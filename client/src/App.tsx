@@ -3,7 +3,15 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { useAuth } from "@/hooks/useAuth";
+import { ProtectedRoute } from "@/components/auth/protected-route";
+
+// Public pages
+import PublicLanding from "@/pages/public-landing";
+import Login from "@/pages/login";
 import NotFound from "@/pages/not-found";
+
+// Protected pages
 import Dashboard from "@/pages/dashboard";
 import DeviceRegistration from "@/pages/device-registration-fixed";
 import RepairTracking from "@/pages/repair-tracking";
@@ -24,29 +32,143 @@ import LoanInvoices from "@/pages/loan-invoices";
 import AppLayout from "@/components/layout/app-layout";
 
 function Router() {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
   return (
-    <AppLayout>
-      <Switch>
-        <Route path="/" component={Dashboard} />
-        <Route path="/device-registration" component={DeviceRegistration} />
-        <Route path="/repair-tracking" component={RepairTracking} />
-        <Route path="/point-of-sale" component={PointOfSale} />
-        <Route path="/inventory" component={Inventory} />
-        <Route path="/inventory-management" component={InventoryManagement} />
-        <Route path="/inventory-predictions" component={InventoryPredictions} />
-        <Route path="/customers" component={Customers} />
-        <Route path="/appointments" component={Appointments} />
-        <Route path="/analytics" component={Analytics} />
-        <Route path="/service-management" component={ServiceManagement} />
-        <Route path="/locations" component={Locations} />
-        <Route path="/workers" component={Workers} />
-        <Route path="/owner-profile" component={OwnerProfile} />
-        <Route path="/expenses" component={Expenses} />
-        <Route path="/loan-invoices" component={LoanInvoices} />
-        <Route path="/settings" component={Settings} />
-        <Route component={NotFound} />
-      </Switch>
-    </AppLayout>
+    <Switch>
+      {/* Public Routes */}
+      <Route path="/login" component={Login} />
+      
+      {/* Protected Routes */}
+      {isAuthenticated ? (
+        <AppLayout>
+          <Switch>
+            <Route path="/">
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            </Route>
+            
+            <Route path="/dashboard">
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            </Route>
+
+            <Route path="/device-registration">
+              <ProtectedRoute requiredPermissions={["manage_devices"]}>
+                <DeviceRegistration />
+              </ProtectedRoute>
+            </Route>
+
+            <Route path="/repair-tracking">
+              <ProtectedRoute requiredPermissions={["manage_devices", "update_repairs"]}>
+                <RepairTracking />
+              </ProtectedRoute>
+            </Route>
+
+            <Route path="/point-of-sale">
+              <ProtectedRoute requiredPermissions={["manage_sales"]}>
+                <PointOfSale />
+              </ProtectedRoute>
+            </Route>
+
+            <Route path="/inventory">
+              <ProtectedRoute requiredPermissions={["view_inventory"]}>
+                <Inventory />
+              </ProtectedRoute>
+            </Route>
+
+            <Route path="/inventory-management">
+              <ProtectedRoute requiredRoles={["admin"]} requiredPermissions={["manage_inventory"]}>
+                <InventoryManagement />
+              </ProtectedRoute>
+            </Route>
+
+            <Route path="/inventory-predictions">
+              <ProtectedRoute requiredRoles={["admin"]} requiredPermissions={["manage_inventory"]}>
+                <InventoryPredictions />
+              </ProtectedRoute>
+            </Route>
+
+            <Route path="/customers">
+              <ProtectedRoute requiredPermissions={["view_customers"]}>
+                <Customers />
+              </ProtectedRoute>
+            </Route>
+
+            <Route path="/appointments">
+              <ProtectedRoute requiredPermissions={["manage_appointments"]}>
+                <Appointments />
+              </ProtectedRoute>
+            </Route>
+
+            <Route path="/analytics">
+              <ProtectedRoute requiredRoles={["admin"]} requiredPermissions={["view_analytics"]}>
+                <Analytics />
+              </ProtectedRoute>
+            </Route>
+
+            <Route path="/service-management">
+              <ProtectedRoute requiredRoles={["admin"]}>
+                <ServiceManagement />
+              </ProtectedRoute>
+            </Route>
+
+            <Route path="/locations">
+              <ProtectedRoute requiredRoles={["admin"]} requiredPermissions={["manage_locations"]}>
+                <Locations />
+              </ProtectedRoute>
+            </Route>
+
+            <Route path="/workers">
+              <ProtectedRoute requiredRoles={["admin"]} requiredPermissions={["manage_users"]}>
+                <Workers />
+              </ProtectedRoute>
+            </Route>
+
+            <Route path="/owner-profile">
+              <ProtectedRoute requiredRoles={["admin"]}>
+                <OwnerProfile />
+              </ProtectedRoute>
+            </Route>
+
+            <Route path="/expenses">
+              <ProtectedRoute requiredRoles={["admin"]} requiredPermissions={["manage_expenses"]}>
+                <Expenses />
+              </ProtectedRoute>
+            </Route>
+
+            <Route path="/loan-invoices">
+              <ProtectedRoute requiredRoles={["admin", "sales"]} requiredPermissions={["create_invoices"]}>
+                <LoanInvoices />
+              </ProtectedRoute>
+            </Route>
+
+            <Route path="/settings">
+              <ProtectedRoute requiredRoles={["admin"]} requiredPermissions={["manage_settings"]}>
+                <Settings />
+              </ProtectedRoute>
+            </Route>
+
+            <Route component={NotFound} />
+          </Switch>
+        </AppLayout>
+      ) : (
+        /* Public Landing Page for non-authenticated users */
+        <Route path="/" component={PublicLanding} />
+      )}
+
+      <Route component={NotFound} />
+    </Switch>
   );
 }
 

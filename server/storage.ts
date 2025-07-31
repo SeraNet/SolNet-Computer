@@ -1735,6 +1735,45 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return invoice;
   }
+
+  // Authentication operations
+  async authenticateUser(username: string, password: string): Promise<any> {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    
+    if (!user) {
+      return null;
+    }
+
+    // Simple password check (in production, use proper password hashing)
+    if (user.password === password) {
+      return user;
+    }
+
+    return null;
+  }
+
+  async getDeviceByCode(code: string): Promise<any> {
+    const [device] = await db
+      .select({
+        customerName: customers.name,
+        deviceDescription: sql<string>`CONCAT(${deviceTypes.name}, ' - ', ${brands.name}, ' ', ${models.name})`,
+        status: devices.status,
+        updatedAt: devices.updatedAt,
+      })
+      .from(devices)
+      .leftJoin(customers, eq(devices.customerId, customers.id))
+      .leftJoin(deviceTypes, eq(devices.deviceTypeId, deviceTypes.id))
+      .leftJoin(brands, eq(devices.brandId, brands.id))
+      .leftJoin(models, eq(devices.modelId, models.id))
+      .where(eq(devices.serialNumber, code));
+    
+    return device;
+  }
+
+  async getBusinessProfile(): Promise<any> {
+    const [profile] = await db.select().from(businessProfile).limit(1);
+    return profile;
+  }
 }
 
 export const storage = new DatabaseStorage();

@@ -1,54 +1,118 @@
-import { Search, Bell, Menu } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { Bell, Search, Settings, User, LogOut } from "lucide-react";
+import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function Header() {
+  const { user, logout } = useAuth();
+
+  const getUserInitials = () => {
+    if (user?.firstName && user?.lastName) {
+      return `${user.firstName[0]}${user.lastName[0]}`.toUpperCase();
+    }
+    return user?.username?.slice(0, 2).toUpperCase() || "U";
+  };
+
+  const getRoleBadgeColor = (role: string) => {
+    switch (role) {
+      case "admin": return "bg-red-100 text-red-800";
+      case "technician": return "bg-blue-100 text-blue-800";
+      case "sales": return "bg-green-100 text-green-800";
+      default: return "bg-gray-100 text-gray-800";
+    }
+  };
+
   return (
-    <div className="relative z-10 flex-shrink-0 flex h-16 bg-white shadow-sm border-b border-gray-200">
-      <Button
-        variant="ghost"
-        size="sm"
-        className="px-4 border-r border-gray-200 text-gray-500 md:hidden"
-      >
-        <Menu className="h-5 w-5" />
-      </Button>
-      
-      <div className="flex-1 px-4 flex justify-between">
-        <div className="flex-1 flex">
-          <div className="w-full flex md:ml-0">
-            <div className="relative w-full text-gray-400 focus-within:text-gray-600">
-              <div className="absolute inset-y-0 left-0 flex items-center pointer-events-none pl-3">
-                <Search className="h-5 w-5" />
-              </div>
-              <Input
-                className="block w-full pl-10 pr-3 py-2 border-transparent bg-transparent text-gray-900 placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-0 focus:border-transparent"
-                placeholder="Search devices, customers, or invoices..."
-                type="search"
-              />
-            </div>
+    <header className="h-16 border-b bg-white px-6">
+      <div className="flex h-full items-center justify-between">
+        <div className="flex items-center space-x-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <Input
+              placeholder="Search devices, customers..."
+              className="w-64 pl-10"
+            />
           </div>
         </div>
-        
-        <div className="ml-4 flex items-center md:ml-6">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="p-1 rounded-full text-gray-400 hover:text-gray-500"
-          >
-            <Bell className="h-6 w-6" />
+
+        <div className="flex items-center space-x-4">
+          <Button variant="ghost" size="icon" className="relative">
+            <Bell className="h-5 w-5" />
+            <Badge className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 text-xs">
+              3
+            </Badge>
           </Button>
-          
-          <div className="ml-3 relative">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="p-0 rounded-full"
-            >
-              <div className="h-8 w-8 rounded-full bg-gray-300"></div>
-            </Button>
-          </div>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="flex items-center space-x-2 px-3">
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback>{getUserInitials()}</AvatarFallback>
+                </Avatar>
+                <div className="flex flex-col items-start">
+                  <span className="text-sm font-medium">
+                    {user?.firstName || user?.username}
+                  </span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${getRoleBadgeColor(user?.role || "")}`}>
+                    {user?.role?.toUpperCase()}
+                  </span>
+                </div>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>
+                <div className="flex flex-col space-y-1">
+                  <p className="text-sm font-medium leading-none">
+                    {user?.firstName} {user?.lastName || user?.username}
+                  </p>
+                  {user?.email && (
+                    <p className="text-xs leading-none text-muted-foreground">
+                      {user.email}
+                    </p>
+                  )}
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              
+              {user?.role === "admin" && (
+                <DropdownMenuItem asChild>
+                  <Link href="/settings">
+                    <Settings className="mr-2 h-4 w-4" />
+                    Settings
+                  </Link>
+                </DropdownMenuItem>
+              )}
+              
+              <DropdownMenuItem asChild>
+                <Link href="/owner-profile">
+                  <User className="mr-2 h-4 w-4" />
+                  Profile
+                </Link>
+              </DropdownMenuItem>
+              
+              <DropdownMenuSeparator />
+              <DropdownMenuItem 
+                onClick={logout}
+                className="text-red-600 focus:text-red-600"
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                Sign out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
-    </div>
+    </header>
   );
 }
