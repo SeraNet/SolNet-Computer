@@ -34,7 +34,12 @@ export function ProtectedRoute({
       return;
     }
 
-    // Check role permissions
+    // Admin users have access to all pages - bypass role and permission checks
+    if (user?.role === 'admin') {
+      return; // Allow access for admin users
+    }
+
+    // Check role permissions for non-admin users
     if (requiredRoles.length > 0 && !hasRole(requiredRoles)) {
       toast({
         title: "Access Denied",
@@ -45,7 +50,7 @@ export function ProtectedRoute({
       return;
     }
 
-    // Check specific permissions
+    // Check specific permissions for non-admin users
     const permissions = Array.isArray(requiredPermissions) ? requiredPermissions : [requiredPermissions];
     if (permissions.length > 0 && !permissions.every(permission => hasPermission(permission))) {
       toast({

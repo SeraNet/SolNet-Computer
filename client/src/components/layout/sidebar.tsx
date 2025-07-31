@@ -43,9 +43,10 @@ export default function Sidebar() {
   const { user, hasRole } = useAuth();
 
   // Filter navigation items based on user role
-  const visibleItems = navigationItems.filter(item => 
-    !item.roles || hasRole(item.roles)
-  );
+  // Admin users can see all items, others are filtered by role
+  const visibleItems = user?.role === 'admin' 
+    ? navigationItems 
+    : navigationItems.filter(item => !item.roles || hasRole(item.roles));
 
   return (
     <div className="hidden md:flex md:w-64 md:flex-col">
@@ -104,7 +105,7 @@ export default function Sidebar() {
                   {user?.firstName || user?.username || 'User'}
                 </p>
                 <p className="text-xs font-medium text-gray-500">
-                  {user?.role?.charAt(0).toUpperCase() + user?.role?.slice(1) || 'Role'}
+                  {user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'Role'}
                 </p>
               </div>
             </div>
