@@ -58,7 +58,14 @@ export default function LoanInvoices() {
 
   const createInvoiceMutation = useMutation({
     mutationFn: async (data: any) => {
-      const response = await apiRequest("POST", "/api/loan-invoices", data);
+      // Convert date string to proper Date object
+      const invoiceData = {
+        ...data,
+        dueDate: new Date(data.dueDate).toISOString(),
+        totalAmount: parseFloat(data.totalAmount),
+        paidAmount: parseFloat(data.paidAmount),
+      };
+      const response = await apiRequest("POST", "/api/loan-invoices", invoiceData);
       return response.json();
     },
     onSuccess: () => {
@@ -199,6 +206,15 @@ export default function LoanInvoices() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.customerId || !formData.deviceDescription || !formData.serviceDescription || !formData.totalAmount) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const remainingAmount = parseFloat(formData.totalAmount) - parseFloat(formData.paidAmount);
     createInvoiceMutation.mutate({
       ...formData,

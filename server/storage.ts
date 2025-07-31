@@ -1567,15 +1567,22 @@ export class DatabaseStorage implements IStorage {
     return invoice;
   }
 
-  async createLoanInvoice(invoice: InsertLoanInvoice): Promise<LoanInvoice> {
+  async createLoanInvoice(invoice: any): Promise<LoanInvoice> {
     // Calculate remaining amount
     const totalAmount = parseFloat(invoice.totalAmount.toString());
     const paidAmount = parseFloat(invoice.paidAmount?.toString() || "0");
     const remainingAmount = totalAmount - paidAmount;
 
     const invoiceData = {
-      ...invoice,
+      customerId: invoice.customerId,
+      deviceDescription: invoice.deviceDescription,
+      serviceDescription: invoice.serviceDescription,
+      totalAmount: totalAmount.toString(),
+      paidAmount: paidAmount.toString(),
       remainingAmount: remainingAmount.toString(),
+      dueDate: new Date(invoice.dueDate),
+      status: invoice.status || "pending",
+      notes: invoice.notes || null,
     };
 
     const [newInvoice] = await db.insert(loanInvoices).values(invoiceData).returning();
