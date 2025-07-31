@@ -13,7 +13,9 @@ import {
   TrendingUp,
   User,
   Receipt,
-  DollarSign
+  DollarSign,
+  Globe,
+  Brain
 } from "lucide-react";
 import { LocationSelector } from "@/components/LocationSelector";
 import { useAuth } from "@/hooks/useAuth";
@@ -29,12 +31,14 @@ const navigationItems = [
   { name: "Customers", href: "/customers", icon: Users, roles: ["admin", "technician", "sales"] },
   { name: "Appointments", href: "/appointments", icon: Calendar, roles: ["admin", "technician", "sales"] },
   { name: "Analytics", href: "/analytics", icon: BarChart3, roles: ["admin"] },
+  { name: "Advanced Analytics", href: "/advanced-analytics", icon: Brain, roles: ["admin"] },
   { name: "Expenses", href: "/expenses", icon: DollarSign, roles: ["admin"] },
   { name: "Loan Invoices", href: "/loan-invoices", icon: Receipt, roles: ["admin", "sales"] },
   { name: "Workers", href: "/workers", icon: Users, roles: ["admin"] },
   { name: "Service Management", href: "/service-management", icon: Settings, roles: ["admin"] },
   { name: "Locations", href: "/locations", icon: MapPin, roles: ["admin"] },
   { name: "Owner Profile", href: "/owner-profile", icon: User, roles: ["admin"] },
+  { name: "Customer Portal", href: "/customer-portal", icon: Globe, roles: ["admin", "technician", "sales"] },
   { name: "Settings", href: "/settings", icon: Settings, roles: ["admin"] },
 ];
 

@@ -29,6 +29,8 @@ import Workers from "@/pages/workers";
 import OwnerProfile from "@/pages/owner-profile";
 import Expenses from "@/pages/expenses";
 import LoanInvoices from "@/pages/loan-invoices";
+import CustomerPortal from "@/pages/customer-portal";
+import AdvancedAnalytics from "@/pages/advanced-analytics";
 import AppLayout from "@/components/layout/app-layout";
 
 function Router() {
@@ -156,6 +158,16 @@ function Router() {
             <Route path="/settings">
               <ProtectedRoute requiredRoles={["admin"]} requiredPermissions={["manage_settings"]}>
                 <Settings />
+              </ProtectedRoute>
+            </Route>
+
+            <Route path="/customer-portal">
+              <CustomerPortal />
+            </Route>
+
+            <Route path="/advanced-analytics">
+              <ProtectedRoute requiredRoles={["admin"]}>
+                <AdvancedAnalytics />
               </ProtectedRoute>
             </Route>
 

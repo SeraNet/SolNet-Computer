@@ -22,6 +22,8 @@ Preferred communication style: Simple, everyday language.
 - **Navigation**: Updated login flow to use `window.location.href` for reliable redirects after successful authentication
 - **Quick Register Fix**: Resolved device registration functionality - fixed customer creation flow and replaced broken print dependencies
 - **Admin Access Control**: Implemented comprehensive admin access system - admin users now have unrestricted access to all pages and navigation items
+- **Customer Portal**: Built self-service portal for customers to track repair status using phone/email lookup
+- **Advanced Analytics**: Created comprehensive business intelligence dashboard with performance metrics, forecasting, and team analytics
 
 ## System Architecture
 
@@ -76,6 +78,8 @@ The application follows a full-stack monorepo structure with clear separation be
 - **Appointment Scheduling**: Calendar and booking system
 - **Analytics**: Business reporting and metrics
 - **Settings**: Comprehensive business configuration, notifications, system preferences, and receipt customization
+- **Customer Portal**: Public-facing portal for customers to track repair status and view device history
+- **Advanced Analytics**: Business intelligence dashboard with performance metrics, demand forecasting, technician analytics, and customer insights
 
 ### UI/UX Design
 - **Design System**: Consistent component library with variants

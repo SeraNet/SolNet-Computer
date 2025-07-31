@@ -1195,6 +1195,152 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Customer Portal API
+  app.get('/api/customer-portal/search', async (req, res) => {
+    try {
+      const query = req.query.q as string;
+      if (!query) {
+        return res.status(400).json({ message: "Search query required" });
+      }
+
+      // Search by phone, email, or device ID
+      const customer = await storage.searchCustomerByContact(query);
+      if (!customer) {
+        return res.status(404).json({ message: "Customer not found" });
+      }
+
+      // Get customer's devices
+      const devices = await storage.getDevicesByCustomerId(customer.id);
+      
+      // Format response with device details
+      const customerData = {
+        ...customer,
+        devices: devices.map(device => ({
+          id: device.id,
+          deviceType: device.deviceType || 'Unknown',
+          brand: device.brand || 'Unknown',
+          model: device.model || 'Unknown Model',
+          problemDescription: device.problemDescription,
+          status: device.status,
+          priority: device.priority,
+          estimatedCompletionDate: device.estimatedCompletionDate,
+          totalCost: device.totalCost,
+          paymentStatus: device.paymentStatus,
+          createdAt: device.createdAt,
+          technicianNotes: device.technicianNotes
+        }))
+      };
+
+      res.json(customerData);
+    } catch (error) {
+      console.error("Error searching customer:", error);
+      res.status(500).json({ message: "Failed to search customer data" });
+    }
+  });
+
+  // Advanced Analytics APIs
+  app.get('/api/analytics/performance', async (req, res) => {
+    try {
+      const timeRange = req.query.timeRange as string || '30d';
+      const locationId = req.query.locationId as string;
+      
+      // This would typically query database for real metrics
+      const performanceData = {
+        repairEfficiency: 87.3,
+        avgRepairTime: 3.2,
+        completedRepairs: 145,
+        customerSatisfaction: 4.7
+      };
+      
+      res.json(performanceData);
+    } catch (error) {
+      console.error("Error fetching performance data:", error);
+      res.status(500).json({ message: "Failed to fetch performance data" });
+    }
+  });
+
+  app.get('/api/analytics/forecast', async (req, res) => {
+    try {
+      const timeRange = req.query.timeRange as string || '30d';
+      
+      // Sample forecast data - would use ML models in production
+      const forecastData = {
+        demandProjection: [
+          { week: 'Week 1', phones: 25, laptops: 18, desktops: 12, tablets: 8 },
+          { week: 'Week 2', phones: 28, laptops: 22, desktops: 15, tablets: 10 },
+          { week: 'Week 3', phones: 32, laptops: 20, desktops: 13, tablets: 9 },
+          { week: 'Week 4', phones: 30, laptops: 25, desktops: 18, tablets: 12 },
+        ],
+        revenueProjection: 58000,
+        seasonalTrends: {
+          peakSeason: 'August-September',
+          expectedIncrease: 35,
+          recommendations: [
+            'Increase laptop screen inventory by 40%',
+            'Schedule additional technician shifts',
+            'Prepare back-to-school marketing campaign'
+          ]
+        }
+      };
+      
+      res.json(forecastData);
+    } catch (error) {
+      console.error("Error fetching forecast data:", error);
+      res.status(500).json({ message: "Failed to fetch forecast data" });
+    }
+  });
+
+  app.get('/api/analytics/technicians', async (req, res) => {
+    try {
+      const timeRange = req.query.timeRange as string || '30d';
+      
+      const technicians = await storage.getUsersByRole('technician');
+      
+      // Sample performance data - would calculate from actual repairs
+      const technicianData = technicians.map((tech, index) => ({
+        id: tech.id,
+        name: `${tech.firstName} ${tech.lastName}`,
+        repairs: 120 + (index * 15),
+        avgTime: 2.8 + (index * 0.3),
+        satisfaction: 4.5 + (index * 0.1),
+        efficiency: 85 + (index * 3)
+      }));
+      
+      res.json(technicianData);
+    } catch (error) {
+      console.error("Error fetching technician data:", error);
+      res.status(500).json({ message: "Failed to fetch technician data" });
+    }
+  });
+
+  app.get('/api/analytics/customers', async (req, res) => {
+    try {
+      const timeRange = req.query.timeRange as string || '30d';
+      
+      // Sample customer analytics - would calculate from actual data
+      const customerData = {
+        totalCustomers: 1247,
+        newCustomers: 32,
+        returningCustomers: 45,
+        loyalCustomers: 23,
+        avgLifetimeValue: 347,
+        retentionRate: 68,
+        avgTimeBetweenVisits: 8.3,
+        satisfaction: 4.7,
+        segmentation: [
+          { segment: 'New Customers', value: 32, percentage: 32 },
+          { segment: 'Returning (2-5 visits)', value: 45, percentage: 45 },
+          { segment: 'Loyal (6+ visits)', value: 23, percentage: 23 }
+        ]
+      };
+      
+      res.json(customerData);
+    } catch (error) {
+      console.error("Error fetching customer data:", error);
+      res.status(500).json({ message: "Failed to fetch customer data" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

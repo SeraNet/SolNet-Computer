@@ -64,11 +64,13 @@ export interface IStorage {
   updateUser(id: string, updates: Partial<InsertUser>): Promise<User>;
   getUsers(): Promise<User[]>;
   getUsersByLocation(locationId: string): Promise<User[]>;
+  getUsersByRole(role: string): Promise<User[]>;
 
   // Customers
   getCustomer(id: string): Promise<Customer | undefined>;
   getCustomers(): Promise<Customer[]>;
   searchCustomers(query: string): Promise<Customer[]>;
+  searchCustomerByContact(query: string): Promise<Customer | undefined>;
   createCustomer(customer: InsertCustomer): Promise<Customer>;
   updateCustomer(id: string, updates: Partial<InsertCustomer>): Promise<Customer>;
 
@@ -76,6 +78,7 @@ export interface IStorage {
   getDevice(id: string): Promise<any>;
   getDevices(): Promise<any[]>;
   getDevicesByLocation(locationId: string): Promise<any[]>;
+  getDevicesByCustomerId(customerId: string): Promise<any[]>;
   getActiveRepairs(): Promise<any[]>;
   getActiveRepairsByLocation(locationId: string): Promise<any[]>;
   createDevice(device: InsertDevice): Promise<Device>;
@@ -241,6 +244,50 @@ export class DatabaseStorage implements IStorage {
       .where(eq(customers.id, id))
       .returning();
     return customer;
+  }
+
+  async searchCustomerByContact(query: string): Promise<Customer | undefined> {
+    const [customer] = await db
+      .select()
+      .from(customers)
+      .where(
+        sql`${customers.phone} ILIKE ${`%${query}%`} OR ${customers.email} ILIKE ${`%${query}%`}`
+      );
+    return customer;
+  }
+
+  async getUsersByRole(role: string): Promise<User[]> {
+    return await db.select().from(users).where(eq(users.role, role));
+  }
+
+  async getDevicesByCustomerId(customerId: string): Promise<any[]> {
+    return await db
+      .select({
+        id: devices.id,
+        customerId: devices.customerId,
+        deviceType: deviceTypes.name,
+        brand: brands.name,
+        model: models.name,
+        serialNumber: devices.serialNumber,
+        problemDescription: devices.problemDescription,
+        serviceType: serviceTypes.name,
+        status: devices.status,
+        priority: devices.priority,
+        estimatedCompletionDate: devices.estimatedCompletionDate,
+        actualCompletionDate: devices.actualCompletionDate,
+        technicianNotes: devices.technicianNotes,
+        totalCost: devices.totalCost,
+        paymentStatus: devices.paymentStatus,
+        createdAt: devices.createdAt,
+        updatedAt: devices.updatedAt,
+      })
+      .from(devices)
+      .leftJoin(deviceTypes, eq(devices.deviceTypeId, deviceTypes.id))
+      .leftJoin(brands, eq(devices.brandId, brands.id))
+      .leftJoin(models, eq(devices.modelId, models.id))
+      .leftJoin(serviceTypes, eq(devices.serviceTypeId, serviceTypes.id))
+      .where(eq(devices.customerId, customerId))
+      .orderBy(desc(devices.createdAt));
   }
 
   // Devices
