@@ -309,8 +309,8 @@ export default function Login() {
               <p className="text-sm text-gray-600 mb-2 font-medium">Demo Credentials:</p>
               <div className="text-xs space-y-1">
                 <div><strong>Admin:</strong> admin / admin123</div>
-                <div><strong>Technician:</strong> tech / tech123</div>
-                <div><strong>Sales:</strong> sales / sales123</div>
+                <div><strong>Technician:</strong> tech1 / tech123</div>
+                <div><strong>Sales:</strong> sales1 / sales123</div>
               </div>
             </div>
 
