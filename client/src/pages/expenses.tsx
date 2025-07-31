@@ -58,8 +58,8 @@ export default function Expenses() {
     mutationFn: async (data: any) => {
       const response = await apiRequest("POST", "/api/expenses", {
         ...data,
-        amount: parseFloat(data.amount),
-        expenseDate: new Date(data.expenseDate).toISOString(),
+        amount: data.amount.toString(),
+        expenseDate: data.expenseDate, // Send as string, server will convert
       });
       return response.json();
     },

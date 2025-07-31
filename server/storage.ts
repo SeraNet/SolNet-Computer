@@ -1575,62 +1575,75 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getExpenseStats(): Promise<any> {
-    const now = new Date();
-    const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const thisYear = new Date(now.getFullYear(), 0, 1);
-    
-    // Current month total
-    const [monthlyTotal] = await db
-      .select({ total: sql<number>`COALESCE(SUM(${expenses.amount}), 0)` })
-      .from(expenses)
-      .where(gte(expenses.expenseDate, thisMonth));
+    try {
+      // Get all expenses to calculate stats manually (simple approach)
+      const allExpenses = await db.select().from(expenses);
+      
+      const now = new Date();
+      const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const thisYear = new Date(now.getFullYear(), 0, 1);
 
-    // Last month total for comparison
-    const [lastMonthTotal] = await db
-      .select({ total: sql<number>`COALESCE(SUM(${expenses.amount}), 0)` })
-      .from(expenses)
-      .where(and(
-        gte(expenses.expenseDate, lastMonth),
-        lte(expenses.expenseDate, thisMonth)
-      ));
+      // Filter expenses by date ranges
+      const thisMonthExpenses = allExpenses.filter(e => 
+        new Date(e.expenseDate) >= thisMonth
+      );
+      
+      const lastMonthExpenses = allExpenses.filter(e => {
+        const expDate = new Date(e.expenseDate);
+        return expDate >= lastMonth && expDate < thisMonth;
+      });
+      
+      const thisYearExpenses = allExpenses.filter(e => 
+        new Date(e.expenseDate) >= thisYear
+      );
 
-    // Year total
-    const [yearlyTotal] = await db
-      .select({ total: sql<number>`COALESCE(SUM(${expenses.amount}), 0)` })
-      .from(expenses)
-      .where(gte(expenses.expenseDate, thisYear));
+      // Calculate totals
+      const monthlyTotal = thisMonthExpenses.reduce((sum, e) => sum + parseFloat(e.amount.toString()), 0);
+      const lastMonthTotal = lastMonthExpenses.reduce((sum, e) => sum + parseFloat(e.amount.toString()), 0);
+      const yearlyTotal = thisYearExpenses.reduce((sum, e) => sum + parseFloat(e.amount.toString()), 0);
 
-    // Total expenses count
-    const [totalExpenses] = await db
-      .select({ count: count() })
-      .from(expenses);
+      // Calculate monthly change
+      const monthlyChange = lastMonthTotal > 0 
+        ? ((monthlyTotal - lastMonthTotal) / lastMonthTotal * 100).toFixed(1)
+        : "0";
 
-    // Top category
-    const topCategory = await db
-      .select({
-        category: expenses.category,
-        total: sql<number>`SUM(${expenses.amount})`,
-      })
-      .from(expenses)
-      .where(gte(expenses.expenseDate, thisYear))
-      .groupBy(expenses.category)
-      .orderBy(sql`SUM(${expenses.amount}) DESC`)
-      .limit(1);
+      // Find top category
+      const categoryTotals = {};
+      thisYearExpenses.forEach(expense => {
+        if (!categoryTotals[expense.category]) {
+          categoryTotals[expense.category] = 0;
+        }
+        categoryTotals[expense.category] += parseFloat(expense.amount.toString());
+      });
 
-    const monthlyChange = lastMonthTotal.total > 0 
-      ? ((monthlyTotal.total - lastMonthTotal.total) / lastMonthTotal.total * 100).toFixed(1)
-      : "0";
+      const topCategory = Object.entries(categoryTotals).reduce((max, [category, total]) => 
+        total > (max[1] || 0) ? [category, total] : max, 
+        ["N/A", 0]
+      );
 
-    return {
-      monthlyTotal: monthlyTotal.total.toFixed(2),
-      monthlyChange,
-      yearlyTotal: yearlyTotal.total.toFixed(2),
-      totalExpenses: totalExpenses.count,
-      topCategory: topCategory[0]?.category || "N/A",
-      topCategoryAmount: topCategory[0]?.total?.toFixed(2) || "0.00",
-      averageMonthly: (yearlyTotal.total / 12).toFixed(2),
-    };
+      return {
+        monthlyTotal: monthlyTotal.toFixed(2),
+        monthlyChange,
+        yearlyTotal: yearlyTotal.toFixed(2),
+        totalExpenses: allExpenses.length,
+        topCategory: topCategory[0],
+        topCategoryAmount: topCategory[1].toFixed(2),
+        averageMonthly: (yearlyTotal / 12).toFixed(2),
+      };
+    } catch (error) {
+      console.error("Error calculating expense stats:", error);
+      // Return default stats when there's an error
+      return {
+        monthlyTotal: "0.00",
+        monthlyChange: "0",
+        yearlyTotal: "0.00", 
+        totalExpenses: 0,
+        topCategory: "N/A",
+        topCategoryAmount: "0.00",
+        averageMonthly: "0.00",
+      };
+    }
   }
 
   // Loan Invoices

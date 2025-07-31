@@ -556,6 +556,9 @@ export const insertWarrantySchema = createInsertSchema(warranties).omit({
 export const insertExpenseSchema = createInsertSchema(expenses).omit({
   id: true,
   createdAt: true,
+}).extend({
+  expenseDate: z.coerce.date(), // Allow string to date conversion
+  amount: z.string(), // Explicitly set amount as string
 });
 
 export const insertPromotionSchema = createInsertSchema(promotions).omit({
