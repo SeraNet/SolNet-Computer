@@ -10,7 +10,8 @@ import {
   BarChart3,
   MapPin,
   Settings,
-  TrendingUp
+  TrendingUp,
+  User
 } from "lucide-react";
 import { LocationSelector } from "@/components/LocationSelector";
 
@@ -27,6 +28,7 @@ const navigationItems = [
   { name: "Workers", href: "/workers", icon: Users },
   { name: "Service Management", href: "/service-management", icon: Settings },
   { name: "Locations", href: "/locations", icon: MapPin },
+  { name: "Owner Profile", href: "/owner-profile", icon: User },
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 

@@ -80,6 +80,33 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Business owner profile table
+export const businessProfile = pgTable("business_profile", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  businessName: text("business_name").notNull(),
+  ownerName: text("owner_name").notNull(),
+  email: text("email").notNull(),
+  phone: text("phone").notNull(),
+  address: text("address").notNull(),
+  city: text("city").notNull(),
+  state: text("state").notNull(),
+  zipCode: text("zip_code").notNull(),
+  country: text("country").notNull().default("USA"),
+  website: text("website"),
+  logo: text("logo"),
+  taxId: text("tax_id"),
+  licenseNumber: text("license_number"),
+  businessType: text("business_type").default("Computer Repair Shop"),
+  description: text("description"),
+  workingHours: jsonb("working_hours"),
+  socialLinks: jsonb("social_links"),
+  bankingInfo: jsonb("banking_info"),
+  insuranceInfo: jsonb("insurance_info"),
+  certifications: jsonb("certifications"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Customers table
 export const customers = pgTable("customers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -227,6 +254,95 @@ export const deviceStatusHistory = pgTable("device_status_history", {
   notes: text("notes"),
   changedBy: varchar("changed_by").references(() => users.id),
   changedAt: timestamp("changed_at").defaultNow(),
+});
+
+// Customer feedback and reviews
+export const customerFeedback = pgTable("customer_feedback", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  customerId: varchar("customer_id").references(() => customers.id).notNull(),
+  deviceId: varchar("device_id").references(() => devices.id),
+  rating: integer("rating").notNull(), // 1-5 stars
+  reviewTitle: text("review_title"),
+  reviewText: text("review_text"),
+  serviceQuality: integer("service_quality"), // 1-5
+  speedOfService: integer("speed_of_service"), // 1-5
+  pricing: integer("pricing"), // 1-5
+  wouldRecommend: boolean("would_recommend"),
+  isPublic: boolean("is_public").notNull().default(false),
+  respondedAt: timestamp("responded_at"),
+  response: text("response"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Warranties and guarantees
+export const warranties = pgTable("warranties", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  deviceId: varchar("device_id").references(() => devices.id).notNull(),
+  warrantyType: text("warranty_type").notNull(), // "repair", "parts", "labor"
+  description: text("description"),
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  terms: text("terms"),
+  isActive: boolean("is_active").notNull().default(true),
+  claimedAt: timestamp("claimed_at"),
+  claimNotes: text("claim_notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Expenses and business costs
+export const expenses = pgTable("expenses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  locationId: varchar("location_id").references(() => locations.id),
+  category: text("category").notNull(), // "rent", "utilities", "supplies", "marketing", etc.
+  description: text("description").notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  expenseDate: timestamp("expense_date").notNull(),
+  vendor: text("vendor"),
+  receiptUrl: text("receipt_url"),
+  notes: text("notes"),
+  isRecurring: boolean("is_recurring").notNull().default(false),
+  recurringFrequency: text("recurring_frequency"), // "monthly", "quarterly", "yearly"
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Marketing campaigns and promotions
+export const promotions = pgTable("promotions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  description: text("description"),
+  discountType: text("discount_type").notNull(), // "percentage", "fixed_amount"
+  discountValue: decimal("discount_value", { precision: 10, scale: 2 }).notNull(),
+  minimumAmount: decimal("minimum_amount", { precision: 10, scale: 2 }),
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  usageLimit: integer("usage_limit"),
+  usageCount: integer("usage_count").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+  promotionCode: text("promotion_code").unique(),
+  applicableServices: jsonb("applicable_services"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Supplier management
+export const suppliers = pgTable("suppliers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  contactPerson: text("contact_person"),
+  email: text("email"),
+  phone: text("phone").notNull(),
+  address: text("address"),
+  city: text("city"),
+  state: text("state"),
+  zipCode: text("zip_code"),
+  country: text("country").default("USA"),
+  website: text("website"),
+  paymentTerms: text("payment_terms"),
+  deliveryTime: integer("delivery_time"), // in days
+  notes: text("notes"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 // Relations
@@ -402,6 +518,38 @@ export const insertServiceTypeSchema = createInsertSchema(serviceTypes).omit({
   createdAt: true,
 });
 
+export const insertBusinessProfileSchema = createInsertSchema(businessProfile).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertCustomerFeedbackSchema = createInsertSchema(customerFeedback).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertWarrantySchema = createInsertSchema(warranties).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertExpenseSchema = createInsertSchema(expenses).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertPromotionSchema = createInsertSchema(promotions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertSupplierSchema = createInsertSchema(suppliers).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type Location = typeof locations.$inferSelect;
 export type InsertLocation = z.infer<typeof insertLocationSchema>;
@@ -438,6 +586,24 @@ export type InsertModel = z.infer<typeof insertModelSchema>;
 
 export type ServiceType = typeof serviceTypes.$inferSelect;
 export type InsertServiceType = z.infer<typeof insertServiceTypeSchema>;
+
+export type BusinessProfile = typeof businessProfile.$inferSelect;
+export type InsertBusinessProfile = z.infer<typeof insertBusinessProfileSchema>;
+
+export type CustomerFeedback = typeof customerFeedback.$inferSelect;
+export type InsertCustomerFeedback = z.infer<typeof insertCustomerFeedbackSchema>;
+
+export type Warranty = typeof warranties.$inferSelect;
+export type InsertWarranty = z.infer<typeof insertWarrantySchema>;
+
+export type Expense = typeof expenses.$inferSelect;
+export type InsertExpense = z.infer<typeof insertExpenseSchema>;
+
+export type Promotion = typeof promotions.$inferSelect;
+export type InsertPromotion = z.infer<typeof insertPromotionSchema>;
+
+export type Supplier = typeof suppliers.$inferSelect;
+export type InsertSupplier = z.infer<typeof insertSupplierSchema>;
 
 // Smart inventory prediction types
 export type InventoryPrediction = {

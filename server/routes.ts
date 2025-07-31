@@ -14,6 +14,7 @@ import {
   insertServiceTypeSchema,
   insertLocationSchema,
   insertUserSchema,
+  insertBusinessProfileSchema,
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -273,6 +274,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating inventory predictions:", error);
       res.status(500).json({ message: "Failed to update inventory predictions" });
+    }
+  });
+
+  // Business Profile
+  app.get("/api/business-profile", async (req, res) => {
+    try {
+      const profile = await storage.getBusinessProfile();
+      res.json(profile);
+    } catch (error) {
+      console.error("Error fetching business profile:", error);
+      res.status(500).json({ message: "Failed to fetch business profile" });
+    }
+  });
+
+  app.put("/api/business-profile", async (req, res) => {
+    try {
+      const data = insertBusinessProfileSchema.parse(req.body);
+      const profile = await storage.upsertBusinessProfile(data);
+      res.json(profile);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid business profile data", errors: error.errors });
+      }
+      console.error("Error updating business profile:", error);
+      res.status(500).json({ message: "Failed to update business profile" });
     }
   });
 

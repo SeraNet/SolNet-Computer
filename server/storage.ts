@@ -12,6 +12,7 @@ import {
   serviceTypes,
   deviceStatusHistory,
   locations,
+  businessProfile,
   type User,
   type InsertUser,
   type Customer,
@@ -36,6 +37,8 @@ import {
   type InsertServiceType,
   type Location,
   type InsertLocation,
+  type BusinessProfile,
+  type InsertBusinessProfile,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, like, and, gte, lte, count, sql } from "drizzle-orm";
@@ -114,6 +117,15 @@ export interface IStorage {
 
   // Analytics
   getDashboardStats(): Promise<any>;
+
+  // Business profile
+  getBusinessProfile(): Promise<BusinessProfile | null>;
+  upsertBusinessProfile(data: InsertBusinessProfile): Promise<BusinessProfile>;
+
+  // Inventory predictions for smart reordering
+  getInventoryPredictions(): Promise<any[]>;
+  getStockAlerts(): Promise<any[]>;
+  updateInventoryPredictions(): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1306,6 +1318,102 @@ export class DatabaseStorage implements IStorage {
 
   async deleteModel(id: string): Promise<void> {
     await db.delete(models).where(eq(models.id, id));
+  }
+
+  // Business Profile
+  async getBusinessProfile(): Promise<BusinessProfile | null> {
+    const [profile] = await db.select().from(businessProfile).limit(1);
+    return profile || null;
+  }
+
+  async upsertBusinessProfile(data: InsertBusinessProfile): Promise<BusinessProfile> {
+    const existingProfile = await this.getBusinessProfile();
+    
+    if (existingProfile) {
+      const [updatedProfile] = await db
+        .update(businessProfile)
+        .set({ ...data, updatedAt: sql`NOW()` })
+        .where(eq(businessProfile.id, existingProfile.id))
+        .returning();
+      return updatedProfile;
+    } else {
+      const [newProfile] = await db
+        .insert(businessProfile)
+        .values(data)
+        .returning();
+      return newProfile;
+    }
+  }
+
+  // Inventory predictions for smart reordering - placeholder implementations
+  async getInventoryPredictions(): Promise<any[]> {
+    // Return enhanced inventory data with predictions
+    const items = await db.select().from(inventoryItems)
+      .where(eq(inventoryItems.isActive, true))
+      .orderBy(asc(inventoryItems.name));
+    
+    return items.map(item => ({
+      ...item,
+      predictedStockoutDays: item.quantity && item.avgDailySales && parseFloat(item.avgDailySales) > 0 
+        ? Math.floor(item.quantity / parseFloat(item.avgDailySales))
+        : null,
+      reorderRecommended: item.quantity <= item.reorderPoint,
+      lowStockAlert: item.quantity <= item.minStockLevel,
+    }));
+  }
+
+  async getStockAlerts(): Promise<any[]> {
+    const lowStockItems = await db.select().from(inventoryItems)
+      .where(and(
+        eq(inventoryItems.isActive, true),
+        lte(inventoryItems.quantity, sql`${inventoryItems.minStockLevel}`)
+      ))
+      .orderBy(asc(inventoryItems.quantity));
+
+    return lowStockItems.map(item => ({
+      id: item.id,
+      name: item.name,
+      currentStock: item.quantity,
+      minStockLevel: item.minStockLevel,
+      alertLevel: item.quantity <= item.minStockLevel ? 'critical' : 'warning',
+      message: `${item.name} is running low (${item.quantity} remaining)`,
+    }));
+  }
+
+  async updateInventoryPredictions(): Promise<void> {
+    // Update prediction calculations based on recent sales data
+    const items = await db.select().from(inventoryItems).where(eq(inventoryItems.isActive, true));
+    
+    for (const item of items) {
+      // Calculate average daily sales over last 30 days
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      
+      const [salesData] = await db
+        .select({ 
+          totalSold: sql<number>`COALESCE(SUM(${saleItems.quantity}), 0)`,
+          dayCount: sql<number>`30`
+        })
+        .from(saleItems)
+        .leftJoin(sales, eq(saleItems.saleId, sales.id))
+        .where(and(
+          eq(saleItems.inventoryItemId, item.id),
+          gte(sales.createdAt, thirtyDaysAgo)
+        ));
+      
+      const avgDailySales = salesData.totalSold / 30;
+      
+      // Update the item with new predictions
+      await db
+        .update(inventoryItems)
+        .set({ 
+          avgDailySales: avgDailySales.toFixed(2),
+          predictedStockout: avgDailySales > 0 
+            ? new Date(Date.now() + (item.quantity / avgDailySales) * 24 * 60 * 60 * 1000)
+            : null
+        })
+        .where(eq(inventoryItems.id, item.id));
+    }
   }
 }
 
