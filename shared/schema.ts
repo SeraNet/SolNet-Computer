@@ -306,6 +306,25 @@ export const expenses = pgTable("expenses", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Loan invoices for payment tracking
+export const loanInvoiceStatusEnum = pgEnum("loan_invoice_status", ["pending", "overdue", "paid", "cancelled"]);
+
+export const loanInvoices = pgTable("loan_invoices", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  customerId: varchar("customer_id").references(() => customers.id).notNull(),
+  deviceDescription: text("device_description").notNull(),
+  serviceDescription: text("service_description").notNull(),
+  totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
+  paidAmount: decimal("paid_amount", { precision: 10, scale: 2 }).notNull().default("0"),
+  remainingAmount: decimal("remaining_amount", { precision: 10, scale: 2 }).notNull(),
+  dueDate: timestamp("due_date").notNull(),
+  status: loanInvoiceStatusEnum("status").notNull().default("pending"),
+  notes: text("notes"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Marketing campaigns and promotions
 export const promotions = pgTable("promotions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -550,6 +569,12 @@ export const insertSupplierSchema = createInsertSchema(suppliers).omit({
   updatedAt: true,
 });
 
+export const insertLoanInvoiceSchema = createInsertSchema(loanInvoices).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type Location = typeof locations.$inferSelect;
 export type InsertLocation = z.infer<typeof insertLocationSchema>;
@@ -604,6 +629,9 @@ export type InsertPromotion = z.infer<typeof insertPromotionSchema>;
 
 export type Supplier = typeof suppliers.$inferSelect;
 export type InsertSupplier = z.infer<typeof insertSupplierSchema>;
+
+export type LoanInvoice = typeof loanInvoices.$inferSelect;
+export type InsertLoanInvoice = z.infer<typeof insertLoanInvoiceSchema>;
 
 // Smart inventory prediction types
 export type InventoryPrediction = {

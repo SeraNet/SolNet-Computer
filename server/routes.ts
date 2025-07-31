@@ -1048,6 +1048,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/loan-invoices", async (req, res) => {
     try {
+      // Basic validation - in a real app you'd use insertLoanInvoiceSchema
       const invoice = await storage.createLoanInvoice(req.body);
       res.status(201).json(invoice);
     } catch (error) {

@@ -42,7 +42,7 @@ export default function LoanInvoices() {
     queryKey: ["/api/loan-invoices"],
   });
 
-  const { data: customers = [] } = useQuery({
+  const { data: customers = [] } = useQuery<any[]>({
     queryKey: ["/api/customers"],
   });
 

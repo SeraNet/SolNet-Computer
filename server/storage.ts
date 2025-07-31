@@ -14,6 +14,7 @@ import {
   locations,
   businessProfile,
   expenses,
+  loanInvoices,
   type User,
   type InsertUser,
   type Customer,
@@ -42,6 +43,8 @@ import {
   type InsertBusinessProfile,
   type Expense,
   type InsertExpense,
+  type LoanInvoice,
+  type InsertLoanInvoice,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, like, and, gte, lte, count, sql } from "drizzle-orm";
@@ -1515,22 +1518,87 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  // Loan Invoices (simplified implementation)
+  // Loan Invoices
   async getLoanInvoices(): Promise<any[]> {
-    // For now, return mock data since we need a proper loan_invoices table
-    return [];
+    return await db
+      .select({
+        id: loanInvoices.id,
+        customerId: loanInvoices.customerId,
+        customerName: customers.name,
+        customerEmail: customers.email,
+        customerPhone: customers.phone,
+        deviceDescription: loanInvoices.deviceDescription,
+        serviceDescription: loanInvoices.serviceDescription,
+        totalAmount: loanInvoices.totalAmount,
+        paidAmount: loanInvoices.paidAmount,
+        remainingAmount: loanInvoices.remainingAmount,
+        dueDate: loanInvoices.dueDate,
+        status: loanInvoices.status,
+        notes: loanInvoices.notes,
+        createdAt: loanInvoices.createdAt,
+      })
+      .from(loanInvoices)
+      .leftJoin(customers, eq(loanInvoices.customerId, customers.id))
+      .orderBy(desc(loanInvoices.createdAt));
   }
 
   async getLoanInvoice(id: string): Promise<any> {
-    return null;
+    const [invoice] = await db
+      .select({
+        id: loanInvoices.id,
+        customerId: loanInvoices.customerId,
+        customerName: customers.name,
+        customerEmail: customers.email,
+        customerPhone: customers.phone,
+        deviceDescription: loanInvoices.deviceDescription,
+        serviceDescription: loanInvoices.serviceDescription,
+        totalAmount: loanInvoices.totalAmount,
+        paidAmount: loanInvoices.paidAmount,
+        remainingAmount: loanInvoices.remainingAmount,
+        dueDate: loanInvoices.dueDate,
+        status: loanInvoices.status,
+        notes: loanInvoices.notes,
+        createdAt: loanInvoices.createdAt,
+      })
+      .from(loanInvoices)
+      .leftJoin(customers, eq(loanInvoices.customerId, customers.id))
+      .where(eq(loanInvoices.id, id));
+    
+    return invoice;
   }
 
-  async createLoanInvoice(invoice: any): Promise<any> {
-    return { ...invoice, id: `invoice_${Date.now()}` };
+  async createLoanInvoice(invoice: InsertLoanInvoice): Promise<LoanInvoice> {
+    // Calculate remaining amount
+    const totalAmount = parseFloat(invoice.totalAmount.toString());
+    const paidAmount = parseFloat(invoice.paidAmount?.toString() || "0");
+    const remainingAmount = totalAmount - paidAmount;
+
+    const invoiceData = {
+      ...invoice,
+      remainingAmount: remainingAmount.toString(),
+    };
+
+    const [newInvoice] = await db.insert(loanInvoices).values(invoiceData).returning();
+    return newInvoice;
   }
 
-  async updateLoanInvoice(id: string, updates: any): Promise<any> {
-    return { id, ...updates };
+  async updateLoanInvoice(id: string, updates: Partial<InsertLoanInvoice>): Promise<LoanInvoice> {
+    // Recalculate remaining amount if total or paid amount changed
+    if (updates.totalAmount || updates.paidAmount) {
+      const [currentInvoice] = await db.select().from(loanInvoices).where(eq(loanInvoices.id, id));
+      if (currentInvoice) {
+        const totalAmount = parseFloat(updates.totalAmount?.toString() || currentInvoice.totalAmount);
+        const paidAmount = parseFloat(updates.paidAmount?.toString() || currentInvoice.paidAmount);
+        updates.remainingAmount = (totalAmount - paidAmount).toString();
+      }
+    }
+
+    const [invoice] = await db
+      .update(loanInvoices)
+      .set({ ...updates, updatedAt: sql`NOW()` })
+      .where(eq(loanInvoices.id, id))
+      .returning();
+    return invoice;
   }
 }
 
