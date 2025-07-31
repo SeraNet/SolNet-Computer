@@ -1371,32 +1371,147 @@ export class DatabaseStorage implements IStorage {
       .where(eq(inventoryItems.isActive, true))
       .orderBy(asc(inventoryItems.name));
     
-    return items.map(item => ({
-      ...item,
-      predictedStockoutDays: item.quantity && item.avgDailySales && parseFloat(item.avgDailySales) > 0 
-        ? Math.floor(item.quantity / parseFloat(item.avgDailySales))
-        : null,
-      reorderRecommended: item.quantity <= item.reorderPoint,
-      lowStockAlert: item.quantity <= item.minStockLevel,
+    // Calculate predictions with real-time sales data if no avgDailySales exists
+    const predictions = await Promise.all(items.map(async (item) => {
+      let avgDailySales = parseFloat(item.avgDailySales || "0");
+      let predictedStockoutDate = null;
+      let predictedStockoutDays = null;
+      let riskLevel = 'low';
+
+      // If no avgDailySales data, calculate from recent sales
+      if (avgDailySales === 0) {
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        
+        const [salesData] = await db
+          .select({ 
+            totalSold: sql<number>`COALESCE(SUM(${saleItems.quantity}), 0)`,
+          })
+          .from(saleItems)
+          .leftJoin(sales, eq(saleItems.saleId, sales.id))
+          .where(and(
+            eq(saleItems.inventoryItemId, item.id),
+            gte(sales.createdAt, thirtyDaysAgo)
+          ));
+        
+        avgDailySales = (salesData?.totalSold || 0) / 30;
+      }
+
+      // Calculate predictions based on sales velocity
+      if (avgDailySales > 0 && item.quantity > 0) {
+        predictedStockoutDays = Math.floor(item.quantity / avgDailySales);
+        predictedStockoutDate = new Date(Date.now() + (predictedStockoutDays * 24 * 60 * 60 * 1000));
+        
+        // Determine risk level
+        if (predictedStockoutDays <= 7) riskLevel = 'critical';
+        else if (predictedStockoutDays <= 14) riskLevel = 'high';
+        else if (predictedStockoutDays <= 30) riskLevel = 'medium';
+        else riskLevel = 'low';
+      }
+
+      // Even without sales data, determine risk based on current stock levels
+      if (avgDailySales === 0) {
+        if (item.quantity <= item.minStockLevel) riskLevel = 'critical';
+        else if (item.quantity <= item.reorderPoint) riskLevel = 'medium';
+        else riskLevel = 'low';
+      }
+
+      return {
+        itemId: item.id,
+        name: item.name,
+        sku: item.sku,
+        category: item.category,
+        currentStock: item.quantity,
+        minStockLevel: item.minStockLevel,
+        reorderPoint: item.reorderPoint,
+        reorderQuantity: item.reorderQuantity,
+        salePrice: item.salePrice,
+        avgDailySales: avgDailySales.toFixed(3),
+        predictedStockout: predictedStockoutDate,
+        daysUntilStockout: predictedStockoutDays,
+        suggestedReorderQuantity: item.reorderQuantity,
+        riskLevel,
+        reorderRecommended: item.quantity <= item.reorderPoint,
+        lowStockAlert: item.quantity <= item.minStockLevel,
+        // Additional useful metrics
+        weeksOfStock: avgDailySales > 0 ? Math.floor(item.quantity / (avgDailySales * 7)) : null,
+        monthlySalesRate: avgDailySales * 30,
+      };
     }));
+
+    return predictions.sort((a, b) => {
+      // Sort by risk level first, then by days until stockout
+      const riskOrder = { 'critical': 0, 'high': 1, 'medium': 2, 'low': 3 };
+      if (riskOrder[a.riskLevel] !== riskOrder[b.riskLevel]) {
+        return riskOrder[a.riskLevel] - riskOrder[b.riskLevel];
+      }
+      if (a.daysUntilStockout && b.daysUntilStockout) {
+        return a.daysUntilStockout - b.daysUntilStockout;
+      }
+      return a.name.localeCompare(b.name);
+    });
   }
 
   async getStockAlerts(): Promise<any[]> {
-    const lowStockItems = await db.select().from(inventoryItems)
-      .where(and(
-        eq(inventoryItems.isActive, true),
-        lte(inventoryItems.quantity, sql`${inventoryItems.minStockLevel}`)
-      ))
+    const items = await db.select().from(inventoryItems)
+      .where(eq(inventoryItems.isActive, true))
       .orderBy(asc(inventoryItems.quantity));
 
-    return lowStockItems.map(item => ({
-      id: item.id,
-      name: item.name,
-      currentStock: item.quantity,
-      minStockLevel: item.minStockLevel,
-      alertLevel: item.quantity <= item.minStockLevel ? 'critical' : 'warning',
-      message: `${item.name} is running low (${item.quantity} remaining)`,
-    }));
+    const alerts = [];
+
+    for (const item of items) {
+      let alert = null;
+      let priority = 'low';
+      let alertType = 'info';
+
+      // Critical: Below minimum stock level
+      if (item.quantity <= item.minStockLevel) {
+        priority = 'critical';
+        alertType = 'low_stock';
+        alert = {
+          id: `alert-${item.id}`,
+          itemId: item.id,
+          itemName: item.name,
+          alertType,
+          priority,
+          message: `CRITICAL: ${item.name} is critically low (${item.quantity}/${item.minStockLevel} minimum)`,
+          currentStock: item.quantity,
+          minStockLevel: item.minStockLevel,
+          reorderPoint: item.reorderPoint,
+          suggestedAction: `Reorder ${item.reorderQuantity} units immediately`,
+          createdAt: new Date(),
+          acknowledged: false,
+        };
+      }
+      // High: Below reorder point but above minimum
+      else if (item.quantity <= item.reorderPoint) {
+        priority = 'high';
+        alertType = 'reorder_required';
+        alert = {
+          id: `alert-${item.id}`,
+          itemId: item.id,
+          itemName: item.name,
+          alertType,
+          priority,
+          message: `Reorder needed: ${item.name} is below reorder point (${item.quantity}/${item.reorderPoint})`,
+          currentStock: item.quantity,
+          minStockLevel: item.minStockLevel,
+          reorderPoint: item.reorderPoint,
+          suggestedAction: `Consider reordering ${item.reorderQuantity} units`,
+          createdAt: new Date(),
+          acknowledged: false,
+        };
+      }
+
+      if (alert) {
+        alerts.push(alert);
+      }
+    }
+
+    return alerts.sort((a, b) => {
+      const priorityOrder = { 'critical': 0, 'high': 1, 'medium': 2, 'low': 3 };
+      return priorityOrder[a.priority] - priorityOrder[b.priority];
+    });
   }
 
   async updateInventoryPredictions(): Promise<void> {

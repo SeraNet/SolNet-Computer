@@ -242,7 +242,7 @@ export default function InventoryPredictions() {
                     <div className="flex-1">
                       <div className="flex items-center gap-3">
                         <div>
-                          <h4 className="font-medium text-gray-900">{prediction.itemName}</h4>
+                          <h4 className="font-medium text-gray-900">{prediction.name}</h4>
                           <p className="text-sm text-gray-500">SKU: {prediction.sku}</p>
                         </div>
                         <Badge variant={getRiskBadgeColor(prediction.riskLevel) as any}>
@@ -263,7 +263,7 @@ export default function InventoryPredictions() {
                         </div>
                         <div>
                           <span className="text-gray-500">Avg Daily Sales:</span>
-                          <div className="font-medium">{prediction.avgDailySales.toFixed(2)}</div>
+                          <div className="font-medium">{parseFloat(prediction.avgDailySales).toFixed(2)}</div>
                         </div>
                         <div>
                           <span className="text-gray-500">Suggested Reorder:</span>
