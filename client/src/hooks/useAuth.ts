@@ -43,8 +43,8 @@ export function useAuth() {
 
   // Update user if server verification returns different data
   useEffect(() => {
-    if (verifiedUser && verifiedUser.id !== user?.id) {
-      setUser(verifiedUser);
+    if (verifiedUser && typeof verifiedUser === 'object' && 'id' in verifiedUser && verifiedUser.id !== user?.id) {
+      setUser(verifiedUser as User);
       localStorage.setItem("user", JSON.stringify(verifiedUser));
     }
   }, [verifiedUser, user]);

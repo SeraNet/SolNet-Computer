@@ -24,13 +24,22 @@ export default function Login() {
   const loginMutation = useMutation({
     mutationFn: async (credentials: { username: string; password: string }) => {
       setLoginState('loading');
-      const response = await apiRequest("POST", "/api/auth/login", credentials);
-      return response.json();
+      console.log('Making login request to:', "/api/auth/login", credentials);
+      try {
+        const response = await apiRequest("POST", "/api/auth/login", credentials);
+        console.log('Login response status:', response.status);
+        const data = await response.json();
+        console.log('Login response data:', data);
+        return data;
+      } catch (error) {
+        console.error('Login error:', error);
+        throw error;
+      }
     },
     onSuccess: (data) => {
       setLoginState('success');
       
-      // Store user data in localStorage or context
+      // Store user data in localStorage
       localStorage.setItem("user", JSON.stringify(data.user));
       localStorage.setItem("token", data.token);
       
@@ -41,20 +50,8 @@ export default function Login() {
 
       // Delay navigation to show success animation
       setTimeout(() => {
-        // Redirect based on role
-        switch (data.user.role) {
-          case "admin":
-            setLocation("/dashboard");
-            break;
-          case "technician":
-            setLocation("/repair-tracking");
-            break;
-          case "sales":
-            setLocation("/point-of-sale");
-            break;
-          default:
-            setLocation("/dashboard");
-        }
+        // Force page reload to ensure auth state is updated
+        window.location.href = "/dashboard";
       }, 1200);
     },
     onError: (error: Error) => {
