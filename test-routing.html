@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Routing Test</title>
+</head>
+<body>
+    <h1>Routing Test</h1>
+    <p>If you can see this, the basic routing is working.</p>
+    <script>
+        console.log('Test page loaded');
+        // Test localStorage
+        const testUser = localStorage.getItem('user');
+        const testToken = localStorage.getItem('token');
+        console.log('User from localStorage:', testUser);
+        console.log('Token from localStorage:', testToken);
+        
+        if (testUser && testToken) {
+            console.log('User is authenticated');
+        } else {
+            console.log('User is not authenticated');
+        }
+    </script>
+</body>
+</html>

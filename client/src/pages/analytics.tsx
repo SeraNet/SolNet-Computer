@@ -1,368 +1,257 @@
-import { useState } from "react";
+import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { 
-  BarChart3, 
-  TrendingUp, 
-  DollarSign, 
-  Users, 
-  Wrench, 
-  ShoppingCart,
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  LineChart,
+  Line,
+} from "recharts";
+import {
+  TrendingUp,
+  Users,
+  Package,
   Calendar,
-  Target,
-  Clock,
-  CheckCircle
+  Wrench,
+  Star,
 } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
+import { formatCurrency } from "@/lib/currency";
 
 export default function Analytics() {
-  const [dateRange, setDateRange] = useState("30");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-
-  const { data: analytics = {}, isLoading } = useQuery({
-    queryKey: ["/api/analytics", { dateRange, startDate, endDate }],
+  // Fetch real analytics data
+  const { data: analyticsData, isLoading } = useQuery({
+    queryKey: ["analytics"],
+    queryFn: () => apiRequest("/api/analytics", "GET"),
   });
 
-  const { data: salesData = [], isLoading: salesLoading } = useQuery({
-    queryKey: ["/api/analytics/sales", { dateRange, startDate, endDate }],
+  // Debug: Log analytics data
+  React.useEffect(() => {
+    if (analyticsData) {
+      console.log("General Analytics Data:", analyticsData);
+      console.log("Total Revenue:", analyticsData.totalRevenue);
+      console.log("Active Repairs:", analyticsData.activeRepairs);
+      console.log("Completed Today:", analyticsData.completedToday);
+      console.log("Customer Satisfaction:", analyticsData.customerSatisfaction);
+    }
+  }, [analyticsData]);
+
+  const { data: monthlyData } = useQuery({
+    queryKey: ["analytics", "monthly"],
+    queryFn: () => apiRequest("/api/analytics/organized/revenue", "GET"),
   });
 
-  const { data: repairData = [], isLoading: repairLoading } = useQuery({
-    queryKey: ["/api/analytics/repairs", { dateRange, startDate, endDate }],
+  const { data: technicianData } = useQuery({
+    queryKey: ["analytics", "technician-efficiency"],
+    queryFn: () => apiRequest("/api/analytics/organized/performance", "GET"),
   });
 
-  const { data: topItems = [], isLoading: topItemsLoading } = useQuery({
-    queryKey: ["/api/analytics/top-items", { dateRange, startDate, endDate }],
+  const { data: satisfactionData } = useQuery({
+    queryKey: ["analytics", "satisfaction"],
+    queryFn: () => apiRequest("/api/analytics/organized/satisfaction", "GET"),
   });
 
-  const { data: revenueData = [], isLoading: revenueLoading } = useQuery({
-    queryKey: ["/api/analytics/revenue", { dateRange, startDate, endDate }],
-  });
+  // Debug: Log other data sources
+  React.useEffect(() => {
+    if (monthlyData) {
+      console.log("Monthly Revenue Data:", monthlyData);
+    }
+    if (technicianData) {
+      console.log("Technician Efficiency Data:", technicianData);
+    }
+    if (satisfactionData) {
+      console.log("Customer Satisfaction Data:", satisfactionData);
+    }
+  }, [monthlyData, technicianData, satisfactionData]);
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount);
-  };
+  // Prepare monthly chart data
+  const monthlyChartData = monthlyData?.totalRevenue?.slice(-6) || [];
 
-  const formatPercentage = (value: number) => {
-    return `${value > 0 ? '+' : ''}${value.toFixed(1)}%`;
-  };
+  // Prepare technician efficiency data
+  const efficiencyData = technicianData?.efficiency?.slice(-6) || [];
 
-  const getStatusColor = (status: string) => {
-    const colors: { [key: string]: string } = {
-      registered: "bg-blue-100 text-blue-800",
-      diagnosed: "bg-yellow-100 text-yellow-800",
-      in_progress: "bg-orange-100 text-orange-800",
-      waiting_parts: "bg-purple-100 text-purple-800",
-      completed: "bg-green-100 text-green-800",
-      ready_for_pickup: "bg-emerald-100 text-emerald-800",
-      delivered: "bg-gray-100 text-gray-800",
-      cancelled: "bg-red-100 text-red-800",
-    };
-    return colors[status] || "bg-gray-100 text-gray-800";
-  };
+  // Debug: Log chart data
+  React.useEffect(() => {
+    console.log("Monthly Chart Data:", monthlyChartData);
+    console.log("Efficiency Data:", efficiencyData);
+  }, [monthlyChartData, efficiencyData]);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Card key={i} className="card-elevated">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <div className="h-4 w-24 bg-gray-200 rounded animate-pulse"></div>
+                <div className="h-4 w-4 bg-gray-200 rounded animate-pulse"></div>
+              </CardHeader>
+              <CardContent>
+                <div className="h-8 w-32 bg-gray-200 rounded animate-pulse mb-2"></div>
+                <div className="h-3 w-24 bg-gray-200 rounded animate-pulse"></div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div>
-      <div className="mb-8 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Analytics</h1>
-          <p className="mt-1 text-sm text-gray-600">View business performance metrics and reports</p>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <Label htmlFor="date-range">Period:</Label>
-            <Select value={dateRange} onValueChange={setDateRange}>
-              <SelectTrigger className="w-32">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="7">Last 7 days</SelectItem>
-                <SelectItem value="30">Last 30 days</SelectItem>
-                <SelectItem value="90">Last 90 days</SelectItem>
-                <SelectItem value="custom">Custom range</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          {dateRange === "custom" && (
-            <div className="flex items-center gap-2">
-              <Input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="w-auto"
-              />
-              <span>to</span>
-              <Input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="w-auto"
-              />
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Total Revenue</p>
-                <p className="text-2xl font-bold">
-                  {isLoading ? "..." : formatCurrency(analytics.totalRevenue || 0)}
-                </p>
-                {!isLoading && analytics.revenueChange !== undefined && (
-                  <p className={`text-xs ${analytics.revenueChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {formatPercentage(analytics.revenueChange)} from last period
-                  </p>
-                )}
-              </div>
-              <div className="p-3 bg-green-100 rounded-full">
-                <DollarSign className="h-6 w-6 text-green-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Active Repairs</p>
-                <p className="text-2xl font-bold">
-                  {isLoading ? "..." : analytics.activeRepairs || 0}
-                </p>
-                {!isLoading && analytics.repairsChange !== undefined && (
-                  <p className={`text-xs ${analytics.repairsChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {formatPercentage(analytics.repairsChange)} from last period
-                  </p>
-                )}
-              </div>
-              <div className="p-3 bg-blue-100 rounded-full">
-                <Wrench className="h-6 w-6 text-blue-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Total Sales</p>
-                <p className="text-2xl font-bold">
-                  {isLoading ? "..." : analytics.totalSales || 0}
-                </p>
-                {!isLoading && analytics.salesChange !== undefined && (
-                  <p className={`text-xs ${analytics.salesChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {formatPercentage(analytics.salesChange)} from last period
-                  </p>
-                )}
-              </div>
-              <div className="p-3 bg-purple-100 rounded-full">
-                <ShoppingCart className="h-6 w-6 text-purple-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">New Customers</p>
-                <p className="text-2xl font-bold">
-                  {isLoading ? "..." : analytics.newCustomers || 0}
-                </p>
-                {!isLoading && analytics.customersChange !== undefined && (
-                  <p className={`text-xs ${analytics.customersChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {formatPercentage(analytics.customersChange)} from last period
-                  </p>
-                )}
-              </div>
-              <div className="p-3 bg-orange-100 rounded-full">
-                <Users className="h-6 w-6 text-orange-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-        {/* Revenue Chart */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
-              Revenue Trend
-            </CardTitle>
+    <div className="space-y-6">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card className="card-elevated bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-slate-900 dark:text-slate-100">Total Revenue</CardTitle>
+            <TrendingUp className="h-4 w-4 text-slate-600 dark:text-slate-400" />
           </CardHeader>
           <CardContent>
-            {revenueLoading ? (
-              <div className="animate-pulse space-y-3">
-                <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                <div className="h-32 bg-gray-200 rounded"></div>
-              </div>
-            ) : revenueData.length === 0 ? (
-              <p className="text-gray-500 text-center py-8">No revenue data available</p>
-            ) : (
-              <div className="space-y-4">
-                {revenueData.map((item: any, index: number) => (
-                  <div key={index} className="flex items-center justify-between p-3 border rounded">
-                    <span className="text-sm text-gray-600">{item.date}</span>
-                    <span className="font-semibold">{formatCurrency(item.revenue)}</span>
-                  </div>
-                ))}
+            <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+              {formatCurrency(analyticsData?.totalRevenue || 0)}
+            </div>
+            <p className="text-xs text-slate-600 dark:text-slate-400">
+              {analyticsData?.revenueChange > 0 ? "+" : ""}
+              {analyticsData?.revenueChange || 0}% from last month
+            </p>
+            {analyticsData?.debug && (
+              <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                <div>Sales: {formatCurrency(analyticsData.debug.salesRevenue || 0)}</div>
+                <div>Repairs: {formatCurrency(analyticsData.debug.repairRevenue || 0)}</div>
               </div>
             )}
           </CardContent>
         </Card>
 
-        {/* Top Selling Items */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Target className="h-5 w-5" />
-              Top Selling Items
+        <Card className="card-elevated bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-slate-900 dark:text-slate-100">
+              Active Repairs
             </CardTitle>
+            <Wrench className="h-4 w-4 text-slate-600 dark:text-slate-400" />
           </CardHeader>
           <CardContent>
-            {topItemsLoading ? (
-              <div className="animate-pulse space-y-3">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <div key={i} className="flex items-center space-x-3">
-                    <div className="h-4 bg-gray-200 rounded w-1/4"></div>
-                    <div className="h-4 bg-gray-200 rounded w-1/2"></div>
-                    <div className="h-4 bg-gray-200 rounded w-1/4"></div>
-                  </div>
-                ))}
-              </div>
-            ) : topItems.length === 0 ? (
-              <p className="text-gray-500 text-center py-8">No sales data available</p>
-            ) : (
-              <div className="space-y-3">
-                {topItems.map((item: any, index: number) => (
-                  <div key={index} className="flex items-center justify-between p-3 border rounded">
-                    <div>
-                      <p className="font-medium">{item.name}</p>
-                      <p className="text-sm text-gray-500">{item.quantity} sold</p>
-                    </div>
-                    <span className="font-semibold">{formatCurrency(item.revenue)}</span>
-                  </div>
-                ))}
-              </div>
+            <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+              {analyticsData?.activeRepairs || 0}
+            </div>
+            <p className="text-xs text-slate-600 dark:text-slate-400">
+              Currently in progress
+            </p>
+            {analyticsData?.repairsChange !== undefined && (
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                {analyticsData.repairsChange > 0 ? "+" : ""}
+                {analyticsData.repairsChange}% from last month
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="card-elevated bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-slate-900 dark:text-slate-100">
+              Completed Today
+            </CardTitle>
+            <Calendar className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+              {analyticsData?.completedToday || 0}
+            </div>
+            <p className="text-xs text-slate-600 dark:text-slate-400">
+              Repairs completed today
+            </p>
+            {analyticsData?.completionRate !== undefined && (
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                {analyticsData.completionRate}% completion rate
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="card-elevated bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-slate-900 dark:text-slate-100">
+              Customer Satisfaction
+            </CardTitle>
+            <Star className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+              {satisfactionData?.overall?.[0]?.value || analyticsData?.customerSatisfaction || "N/A"}
+            </div>
+            <p className="text-xs text-slate-600 dark:text-slate-400">Average rating</p>
+            {satisfactionData?.overall?.[0]?.count && (
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                Based on {satisfactionData.overall[0].count} reviews
+              </p>
             )}
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Repair Status Distribution */}
-        <Card>
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card className="card-elevated bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5" />
-              Repair Status Distribution
-            </CardTitle>
+            <CardTitle className="text-slate-900 dark:text-slate-100">Monthly Revenue Overview</CardTitle>
+            <p className="text-sm text-slate-600 dark:text-slate-400">Last 6 months revenue trend</p>
           </CardHeader>
           <CardContent>
-            {repairLoading ? (
-              <div className="animate-pulse space-y-3">
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className="flex items-center space-x-3">
-                    <div className="h-4 bg-gray-200 rounded w-1/3"></div>
-                    <div className="h-4 bg-gray-200 rounded w-1/4"></div>
-                    <div className="h-4 bg-gray-200 rounded w-1/4"></div>
-                  </div>
-                ))}
-              </div>
-            ) : repairData.length === 0 ? (
-              <p className="text-gray-500 text-center py-8">No repair data available</p>
+            {monthlyChartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={monthlyChartData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" />
+                  <YAxis />
+                  <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+                  <Bar dataKey="revenue" fill="#8884d8" />
+                </BarChart>
+              </ResponsiveContainer>
             ) : (
-              <div className="space-y-3">
-                {repairData.map((item: any, index: number) => (
-                  <div key={index} className="flex items-center justify-between p-3 border rounded">
-                    <div className="flex items-center gap-3">
-                      <Badge className={getStatusColor(item.status)}>
-                        {item.status.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
-                      </Badge>
-                    </div>
-                    <span className="font-semibold">{item.count} devices</span>
-                  </div>
-                ))}
+              <div className="flex items-center justify-center h-[300px] text-slate-500 dark:text-slate-400">
+                <div className="text-center">
+                  <TrendingUp className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <p>No revenue data available</p>
+                  <p className="text-sm">Add some sales or completed repairs to see trends</p>
+                </div>
               </div>
             )}
           </CardContent>
         </Card>
 
-        {/* Recent Performance */}
-        <Card>
+        <Card className="card-elevated bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5" />
-              Performance Metrics
-            </CardTitle>
+            <CardTitle className="text-slate-900 dark:text-slate-100">Technician Efficiency</CardTitle>
+            <p className="text-sm text-slate-600 dark:text-slate-400">Performance over time</p>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-3 border rounded">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-green-100 rounded">
-                    <CheckCircle className="h-4 w-4 text-green-600" />
-                  </div>
-                  <span className="text-sm">Completion Rate</span>
+            {efficiencyData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={efficiencyData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" />
+                  <YAxis />
+                  <Tooltip formatter={(value) => `${value}%`} />
+                  <Line
+                    type="monotone"
+                    dataKey="efficiency"
+                    stroke="#82ca9d"
+                    strokeWidth={2}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-[300px] text-slate-500 dark:text-slate-400">
+                <div className="text-center">
+                  <Users className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <p>No efficiency data available</p>
+                  <p className="text-sm">Complete some repairs to see technician performance</p>
                 </div>
-                <span className="font-semibold">
-                  {isLoading ? "..." : `${analytics.completionRate || 0}%`}
-                </span>
               </div>
-              
-              <div className="flex items-center justify-between p-3 border rounded">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-100 rounded">
-                    <Clock className="h-4 w-4 text-blue-600" />
-                  </div>
-                  <span className="text-sm">Avg. Repair Time</span>
-                </div>
-                <span className="font-semibold">
-                  {isLoading ? "..." : `${analytics.avgRepairTime || 0} days`}
-                </span>
-              </div>
-              
-              <div className="flex items-center justify-between p-3 border rounded">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-purple-100 rounded">
-                    <Calendar className="h-4 w-4 text-purple-600" />
-                  </div>
-                  <span className="text-sm">Appointments Today</span>
-                </div>
-                <span className="font-semibold">
-                  {isLoading ? "..." : analytics.appointmentsToday || 0}
-                </span>
-              </div>
-              
-              <div className="flex items-center justify-between p-3 border rounded">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-orange-100 rounded">
-                    <DollarSign className="h-4 w-4 text-orange-600" />
-                  </div>
-                  <span className="text-sm">Avg. Transaction</span>
-                </div>
-                <span className="font-semibold">
-                  {isLoading ? "..." : formatCurrency(analytics.avgTransaction || 0)}
-                </span>
-              </div>
-            </div>
+            )}
           </CardContent>
         </Card>
       </div>

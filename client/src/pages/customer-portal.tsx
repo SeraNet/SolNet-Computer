@@ -1,6 +1,12 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -8,7 +14,19 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Search, Phone, Mail, MapPin, Calendar, DollarSign, Clock, CheckCircle } from "lucide-react";
+import { formatCurrency } from "@/lib/currency";
+import { PageLayout } from "@/components/layout/page-layout";
+import {
+  Search,
+  Phone,
+  Mail,
+  MapPin,
+  Calendar,
+  Clock,
+  CheckCircle,
+  User,
+  Package,
+} from "lucide-react";
 
 interface CustomerDevice {
   id: string;
@@ -43,11 +61,10 @@ export default function CustomerPortal() {
 
   const searchMutation = useMutation({
     mutationFn: async (query: string) => {
-      const response = await fetch(`/api/customer-portal/search?q=${encodeURIComponent(query)}`);
-      if (!response.ok) {
-        throw new Error('Search failed');
-      }
-      return response.json();
+      return await apiRequest(
+        `/api/customer-portal/search?q=${encodeURIComponent(query)}`,
+        "GET"
+      );
     },
     onSuccess: (data: CustomerInfo) => {
       setCustomerData(data);
@@ -55,17 +72,18 @@ export default function CustomerPortal() {
         toast({
           title: "No Results",
           description: "No devices found for this customer information.",
-          variant: "destructive"
+          variant: "destructive",
         });
       }
     },
     onError: () => {
       toast({
         title: "Search Failed",
-        description: "Unable to find customer information. Please check your details.",
-        variant: "destructive"
+        description:
+          "Unable to find customer information. Please check your details.",
+        variant: "destructive",
       });
-    }
+    },
   });
 
   const handleSearch = () => {
@@ -73,7 +91,7 @@ export default function CustomerPortal() {
       toast({
         title: "Search Required",
         description: "Please enter your phone number, email, or device ID.",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
@@ -82,40 +100,50 @@ export default function CustomerPortal() {
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
-      case 'completed': return 'bg-green-500';
-      case 'in-progress': return 'bg-blue-500';
-      case 'waiting-parts': return 'bg-yellow-500';
-      case 'ready-pickup': return 'bg-purple-500';
-      default: return 'bg-gray-500';
+      case "completed":
+        return "bg-green-500";
+      case "in-progress":
+        return "bg-blue-500";
+      case "waiting-parts":
+        return "bg-yellow-500";
+      case "ready-pickup":
+        return "bg-purple-500";
+      default:
+        return "bg-gray-500";
     }
   };
 
   const getPriorityColor = (priority: string) => {
     switch (priority.toLowerCase()) {
-      case 'urgent': return 'bg-red-500';
-      case 'high': return 'bg-orange-500';
-      case 'normal': return 'bg-blue-500';
-      case 'low': return 'bg-gray-500';
-      default: return 'bg-blue-500';
+      case "urgent":
+        return "bg-red-500";
+      case "high":
+        return "bg-orange-500";
+      case "normal":
+        return "bg-blue-500";
+      case "low":
+        return "bg-gray-500";
+      default:
+        return "bg-blue-500";
     }
   };
 
   return (
-    <div className="container mx-auto p-6 max-w-6xl">
-      <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Customer Portal</h1>
-        <p className="text-gray-600">Track your device repairs and view service history</p>
-      </div>
-
+    <PageLayout
+      title="Customer Portal"
+      subtitle="Track your device repairs and view service history"
+      icon={User}
+    >
       {/* Search Section */}
-      <Card className="mb-8">
+      <Card className="card-elevated mb-8">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Search className="h-5 w-5" />
+          <CardTitle className="flex items-center gap-2 text-slate-900 dark:text-slate-100">
+            <Search className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             Find Your Devices
           </CardTitle>
-          <CardDescription>
-            Enter your phone number, email address, or device ID to view your repair status
+          <CardDescription className="text-slate-600 dark:text-slate-400">
+            Enter your phone number, email address, or device ID to view your
+            repair status
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -124,11 +152,11 @@ export default function CustomerPortal() {
               placeholder="Phone number, email, or device ID..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
               className="flex-1"
             />
-            <Button 
-              onClick={handleSearch} 
+            <Button
+              onClick={handleSearch}
               disabled={searchMutation.isPending}
               className="px-6"
             >
@@ -141,28 +169,31 @@ export default function CustomerPortal() {
       {/* Customer Information */}
       {customerData && (
         <div className="space-y-6">
-          <Card>
+          <Card className="card-elevated">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <div className="h-8 w-8 bg-primary rounded-full flex items-center justify-center text-white font-bold">
-                  {customerData.firstName?.charAt(0)}{customerData.lastName?.charAt(0)}
+              <CardTitle className="flex items-center gap-3 text-slate-900 dark:text-slate-100">
+                <div className="h-10 w-10 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                  {customerData.firstName?.charAt(0)}
+                  {customerData.lastName?.charAt(0)}
                 </div>
                 {customerData.firstName} {customerData.lastName}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="flex items-center gap-2">
-                  <Phone className="h-4 w-4 text-gray-500" />
+                <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
+                  <Phone className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                   <span>{customerData.phone}</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Mail className="h-4 w-4 text-gray-500" />
+                <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
+                  <Mail className="h-4 w-4 text-purple-600 dark:text-purple-400" />
                   <span>{customerData.email}</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4 text-gray-500" />
-                  <span>{customerData.address}, {customerData.city}</span>
+                <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
+                  <MapPin className="h-4 w-4 text-green-600 dark:text-green-400" />
+                  <span>
+                    {customerData.address}, {customerData.city}
+                  </span>
                 </div>
               </div>
             </CardContent>
@@ -170,22 +201,30 @@ export default function CustomerPortal() {
 
           {/* Devices */}
           <div className="space-y-4">
-            <h2 className="text-2xl font-bold">Your Devices</h2>
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Your Devices</h2>
             {customerData.devices.map((device) => (
-              <Card key={device.id} className="overflow-hidden">
+              <Card key={device.id} className="card-elevated overflow-hidden">
                 <CardHeader className="pb-3">
                   <div className="flex justify-between items-start">
                     <div>
-                      <CardTitle className="text-lg">
+                      <CardTitle className="text-lg text-slate-900 dark:text-slate-100">
                         {device.brand} {device.model}
                       </CardTitle>
-                      <CardDescription>{device.deviceType}</CardDescription>
+                      <CardDescription className="text-slate-600 dark:text-slate-400">{device.deviceType}</CardDescription>
                     </div>
                     <div className="flex gap-2">
-                      <Badge className={`${getStatusColor(device.status)} text-white`}>
-                        {device.status.replace('-', ' ').toUpperCase()}
+                      <Badge
+                        className={`${getStatusColor(
+                          device.status
+                        )} text-white`}
+                      >
+                        {device.status.replace("-", " ").toUpperCase()}
                       </Badge>
-                      <Badge className={`${getPriorityColor(device.priority)} text-white`}>
+                      <Badge
+                        className={`${getPriorityColor(
+                          device.priority
+                        )} text-white`}
+                      >
                         {device.priority.toUpperCase()}
                       </Badge>
                     </div>
@@ -193,74 +232,100 @@ export default function CustomerPortal() {
                 </CardHeader>
                 <CardContent>
                   <Tabs defaultValue="details" className="w-full">
-                    <TabsList className="grid w-full grid-cols-3">
-                      <TabsTrigger value="details">Details</TabsTrigger>
-                      <TabsTrigger value="status">Status</TabsTrigger>
-                      <TabsTrigger value="payment">Payment</TabsTrigger>
+                    <TabsList className="grid w-full grid-cols-3 h-auto p-1 bg-slate-100 dark:bg-slate-800 rounded-lg">
+                      <TabsTrigger value="details" className="data-[state=active]:bg-white data-[state=active]:dark:bg-slate-900 data-[state=active]:shadow-sm py-2 rounded-md">Details</TabsTrigger>
+                      <TabsTrigger value="status" className="data-[state=active]:bg-white data-[state=active]:dark:bg-slate-900 data-[state=active]:shadow-sm py-2 rounded-md">Status</TabsTrigger>
+                      <TabsTrigger value="payment" className="data-[state=active]:bg-white data-[state=active]:dark:bg-slate-900 data-[state=active]:shadow-sm py-2 rounded-md">Payment</TabsTrigger>
                     </TabsList>
-                    
+
                     <TabsContent value="details" className="mt-4">
                       <div className="space-y-3">
                         <div>
-                          <h4 className="font-medium text-gray-900">Problem Description</h4>
-                          <p className="text-gray-600">{device.problemDescription}</p>
+                          <h4 className="font-medium text-slate-900 dark:text-slate-100">
+                            Problem Description
+                          </h4>
+                          <p className="text-slate-600 dark:text-slate-400">
+                            {device.problemDescription}
+                          </p>
                         </div>
-                        <div className="flex items-center gap-4 text-sm text-gray-600">
+                        <div className="flex items-center gap-4 text-sm text-slate-600 dark:text-slate-400">
                           <div className="flex items-center gap-1">
                             <Calendar className="h-4 w-4" />
-                            Received: {new Date(device.createdAt).toLocaleDateString()}
+                            Received:{" "}
+                            {new Date(device.createdAt).toLocaleDateString()}
                           </div>
                           {device.estimatedCompletionDate && (
                             <div className="flex items-center gap-1">
                               <Clock className="h-4 w-4" />
-                              Est. Completion: {new Date(device.estimatedCompletionDate).toLocaleDateString()}
+                              Est. Completion:{" "}
+                              {new Date(
+                                device.estimatedCompletionDate
+                              ).toLocaleDateString()}
                             </div>
                           )}
                         </div>
                       </div>
                     </TabsContent>
-                    
+
                     <TabsContent value="status" className="mt-4">
                       <div className="space-y-3">
-                        <div className="flex items-center gap-2">
-                          <div className={`h-3 w-3 rounded-full ${getStatusColor(device.status)}`}></div>
-                          <span className="font-medium">Current Status: {device.status.replace('-', ' ')}</span>
+                        <div className="flex items-center gap-2 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
+                          <div
+                            className={`h-3 w-3 rounded-full ${getStatusColor(
+                              device.status
+                            )}`}
+                          ></div>
+                          <span className="font-medium text-slate-900 dark:text-slate-100">
+                            Current Status: {device.status.replace("-", " ")}
+                          </span>
                         </div>
                         {device.technicianNotes && (
-                          <div>
-                            <h4 className="font-medium text-gray-900">Technician Notes</h4>
-                            <p className="text-gray-600">{device.technicianNotes}</p>
+                          <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                            <h4 className="font-medium text-slate-900 dark:text-slate-100 mb-2">
+                              Technician Notes
+                            </h4>
+                            <p className="text-slate-600 dark:text-slate-400">
+                              {device.technicianNotes}
+                            </p>
                           </div>
                         )}
-                        <div className="bg-gray-50 p-3 rounded-lg">
-                          <p className="text-sm text-gray-600">
-                            We'll notify you when your device status changes. 
-                            If you have questions, please call us at (555) 123-4567.
+                        <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
+                          <p className="text-sm text-slate-600 dark:text-slate-400">
+                            We'll notify you when your device status changes. If
+                            you have questions, please call us at 091 334 1664.
                           </p>
                         </div>
                       </div>
                     </TabsContent>
-                    
+
                     <TabsContent value="payment" className="mt-4">
                       <div className="space-y-3">
-                        <div className="flex justify-between items-center">
-                          <span className="font-medium">Total Cost</span>
-                          <span className="text-lg font-bold">
-                            {device.totalCost ? `$${device.totalCost.toFixed(2)}` : 'Estimate Pending'}
+                        <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
+                          <span className="font-medium text-slate-900 dark:text-slate-100">Total Cost</span>
+                          <span className="text-lg font-bold text-slate-900 dark:text-slate-100">
+                            {device.totalCost
+                              ? formatCurrency(device.totalCost)
+                              : "Estimate Pending"}
                           </span>
                         </div>
-                        <div className="flex justify-between items-center">
-                          <span>Payment Status</span>
-                          <Badge className={device.paymentStatus === 'paid' ? 'bg-green-500' : 'bg-yellow-500'}>
+                        <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
+                          <span className="text-slate-700 dark:text-slate-300">Payment Status</span>
+                          <Badge
+                            className={
+                              device.paymentStatus === "paid"
+                                ? "bg-green-500 text-white"
+                                : "bg-yellow-500 text-white"
+                            }
+                          >
                             {device.paymentStatus.toUpperCase()}
                           </Badge>
                         </div>
-                        {device.paymentStatus === 'pending' && device.totalCost && (
-                          <Button className="w-full mt-4">
-                            <DollarSign className="h-4 w-4 mr-2" />
-                            Pay Online - ${device.totalCost.toFixed(2)}
-                          </Button>
-                        )}
+                        {device.paymentStatus === "pending" &&
+                          device.totalCost && (
+                            <Button className="w-full mt-4">
+                              Pay Online - {formatCurrency(device.totalCost)}
+                            </Button>
+                          )}
                       </div>
                     </TabsContent>
                   </Tabs>
@@ -273,16 +338,21 @@ export default function CustomerPortal() {
 
       {/* Empty State */}
       {!customerData && !searchMutation.isPending && (
-        <Card className="text-center py-12">
-          <CardContent>
-            <Search className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Find Your Repairs</h3>
-            <p className="text-gray-600">
-              Enter your contact information above to view your device repair status and history.
+        <Card className="card-elevated text-center">
+          <CardContent className="py-12">
+            <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <Search className="h-8 w-8 text-white" />
+            </div>
+            <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">
+              Find Your Repairs
+            </h3>
+            <p className="text-slate-600 dark:text-slate-400">
+              Enter your contact information above to view your device repair
+              status and history.
             </p>
           </CardContent>
         </Card>
       )}
-    </div>
+    </PageLayout>
   );
 }

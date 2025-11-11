@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { ReactNode, useRef } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocation } from "wouter";
 import { useEffect } from "react";
@@ -18,11 +18,23 @@ export function ProtectedRoute({
   fallbackPath = "/login" 
 }: ProtectedRouteProps) {
   const { user, isLoading, isAuthenticated, hasRole, hasPermission } = useAuth();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const { toast } = useToast();
+  const hasCheckedRef = useRef(false);
+  const lastLocationRef = useRef(location);
 
   useEffect(() => {
-    if (isLoading) return;
+    // Reset check flag when location changes
+    if (lastLocationRef.current !== location) {
+      hasCheckedRef.current = false;
+      lastLocationRef.current = location;
+    }
+
+    // Don't run checks while loading or if already checked
+    if (isLoading || hasCheckedRef.current) return;
+
+    // Mark as checked to prevent repeated checks
+    hasCheckedRef.current = true;
 
     if (!isAuthenticated) {
       toast({
@@ -61,7 +73,7 @@ export function ProtectedRoute({
       setLocation("/dashboard");
       return;
     }
-  }, [isLoading, isAuthenticated, user, hasRole, hasPermission, requiredRoles, requiredPermissions, setLocation, toast, fallbackPath]);
+  }, [isLoading, isAuthenticated, user?.role, location, requiredRoles, requiredPermissions, setLocation, toast, fallbackPath, hasRole, hasPermission]);
 
   if (isLoading) {
     return (

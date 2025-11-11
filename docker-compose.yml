@@ -1,0 +1,62 @@
+version: "3.8"
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15
+    container_name: solnetmanage-db
+    environment:
+      POSTGRES_DB: solnetmanage
+      POSTGRES_USER: solnetuser
+      POSTGRES_PASSWORD: solnetpass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U solnetuser -d solnetmanage"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Application
+  app:
+    build: .
+    container_name: solnetmanage-app
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://solnetuser:solnetpass@postgres:5432/solnetmanage
+      - PORT=5000
+      - JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+      - SESSION_SECRET=your-super-secret-session-key-change-this-in-production
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
+      - HELMET_ENABLED=true
+      - CONTENT_SECURITY_POLICY=true
+      - SESSION_COOKIE_SECURE=false
+      - SESSION_COOKIE_HTTPONLY=true
+      - ENABLE_DEBUG_LOGS=false
+    ports:
+      - "5000:5000"
+    volumes:
+      - uploads_data:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get('http://localhost:5000/api/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  postgres_data:
+  uploads_data:

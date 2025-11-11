@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
-
+import { apiRequest } from "@/lib/queryClient";
 export interface User {
   id: string;
   username: string;
@@ -9,93 +9,178 @@ export interface User {
   lastName?: string;
   role: "admin" | "technician" | "sales";
   locationId?: string;
+  profilePicture?: string;
   isActive: boolean;
 }
-
-export function useAuth() {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Check for stored user data on mount
-  useEffect(() => {
+// Initialize user state synchronously from localStorage to prevent flash
+const getInitialUser = (): User | null => {
+  try {
+    if (typeof window === 'undefined') return null;
     const storedUser = localStorage.getItem("user");
     const token = localStorage.getItem("token");
-    
     if (storedUser && token) {
-      try {
-        setUser(JSON.parse(storedUser));
-      } catch (error) {
-        console.error("Error parsing stored user data:", error);
-        localStorage.removeItem("user");
-        localStorage.removeItem("token");
-      }
+      return JSON.parse(storedUser);
     }
-    setIsLoading(false);
-  }, []);
+  } catch (error) {
+    console.error("Failed to parse stored user data:", error);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem("user");
+      localStorage.removeItem("token");
+    }
+  }
+  return null;
+};
 
-  // Verify token with server (optional, for enhanced security)
-  const { data: verifiedUser } = useQuery({
-    queryKey: ["/api/auth/verify"],
-    enabled: !!localStorage.getItem("token"),
+export function useAuth() {
+  const [user, setUser] = useState<User | null>(getInitialUser);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(true);
+
+  // Mark as initialized immediately since we're loading synchronously
+  useEffect(() => {
+    // Auth initialized
+  }, []);
+  // Verify token with server (only if we have a token and user)
+  const { data: verifiedUser, error: verifyError } = useQuery({
+    queryKey: ["auth", "verify"],
+    queryFn: async () => {
+      try {
+        const token = localStorage.getItem("token");
+        if (!token) throw new Error("No token");
+        const response = await fetch("/api/auth/verify", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        if (!response.ok) {
+          throw new Error("Token verification failed");
+        }
+        return response.json();
+      } catch (error) {
+        console.error("Token verification error:", error);
+        throw error;
+      }
+    },
+    enabled: !!localStorage.getItem("token") && !!user && !isLoading,
     retry: false,
     staleTime: 5 * 60 * 1000, // 5 minutes
+    refetchInterval: 10 * 60 * 1000, // 10 minutes
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    gcTime: 0, // Don't cache this query
   });
-
   // Update user if server verification returns different data
   useEffect(() => {
-    if (verifiedUser && typeof verifiedUser === 'object' && 'id' in verifiedUser && verifiedUser.id !== user?.id) {
-      setUser(verifiedUser as User);
-      localStorage.setItem("user", JSON.stringify(verifiedUser));
+    if (
+      verifiedUser &&
+      typeof verifiedUser === "object" &&
+      "id" in verifiedUser
+    ) {
+      try {
+        setUser(verifiedUser as User);
+        localStorage.setItem("user", JSON.stringify(verifiedUser));
+      } catch (error) {
+        console.error("Error updating user from verification:", error);
+      }
     }
-  }, [verifiedUser, user]);
-
+  }, [verifiedUser]);
+  // Handle verification errors gracefully - don't logout immediately
+  useEffect(() => {
+    if (verifyError && user) {
+      console.warn(
+        "Token verification failed, but keeping user logged in:",
+        verifyError
+      );
+      // Only logout if the error is specifically about invalid token
+      if (
+        verifyError.message.includes("Invalid token") ||
+        verifyError.message.includes("401") ||
+        verifyError.message.includes("Token verification failed")
+      ) {
+        // Logout immediately instead of using setTimeout
+        logout();
+      }
+    }
+  }, [verifyError, user]);
   const login = (userData: User, token: string) => {
-    setUser(userData);
-    localStorage.setItem("user", JSON.stringify(userData));
-    localStorage.setItem("token", token);
+    try {
+      // Update state and storage synchronously
+      localStorage.setItem("user", JSON.stringify(userData));
+      localStorage.setItem("token", token);
+      setUser(userData);
+      
+      // Force a small delay to ensure state updates propagate
+      return new Promise<void>((resolve) => {
+        setTimeout(() => {
+          resolve();
+        }, 50);
+      });
+    } catch (error) {
+      console.error("Error during login:", error);
+      // Clear any partial state
+      setUser(null);
+      localStorage.removeItem("user");
+      localStorage.removeItem("token");
+      throw error;
+    }
   };
-
   const logout = () => {
-    setUser(null);
-    localStorage.removeItem("user");
-    localStorage.removeItem("token");
-    window.location.href = "/";
+    try {
+      setUser(null);
+      localStorage.removeItem("user");
+      localStorage.removeItem("token");
+      // Navigate immediately instead of using setTimeout
+      window.location.href = "/";
+    } catch (error) {
+      console.error("Error during logout:", error);
+      // Fallback: force reload
+      window.location.reload();
+    }
   };
-
-  const hasRole = (requiredRoles: string | string[]) => {
+  const hasRole = useCallback((requiredRoles: string | string[]) => {
     if (!user) return false;
-    
-    const roles = Array.isArray(requiredRoles) ? requiredRoles : [requiredRoles];
+    // Admin has access to all roles
+    if (user.role === "admin") {
+      return true;
+    }
+    const roles = Array.isArray(requiredRoles)
+      ? requiredRoles
+      : [requiredRoles];
     return roles.includes(user.role);
-  };
-
-  const hasPermission = (permission: string) => {
+  }, [user]);
+  
+  const hasPermission = useCallback((permission: string) => {
     if (!user) return false;
-
-    // Define role-based permissions
+    // Admin has all permissions
+    if (user.role === "admin") {
+      return true;
+    }
+    // Define role-based permissions for non-admin users
     const permissions = {
-      admin: [
-        "view_dashboard", "manage_users", "manage_locations", "view_analytics",
-        "manage_inventory", "manage_expenses", "manage_settings", "view_reports",
-        "manage_devices", "manage_customers", "manage_appointments", "manage_sales"
-      ],
       technician: [
-        "view_dashboard", "manage_devices", "view_customers", "manage_appointments",
-        "view_inventory", "update_repairs"
+        "view_dashboard",
+        "manage_devices",
+        "view_customers",
+        "manage_appointments",
+        "view_inventory",
+        "update_repairs",
       ],
       sales: [
-        "view_dashboard", "manage_sales", "view_customers", "manage_appointments",
-        "view_inventory", "create_invoices"
-      ]
+        "view_dashboard",
+        "manage_sales",
+        "view_customers",
+        "manage_appointments",
+        "view_inventory",
+        "create_invoices",
+      ],
     };
-
     return permissions[user.role]?.includes(permission) || false;
-  };
-
+  }, [user]);
   return {
     user,
-    isLoading,
+    isLoading: isLoading || !isInitialized,
     isAuthenticated: !!user,
+    isInitialized,
     login,
     logout,
     hasRole,

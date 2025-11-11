@@ -1,19 +1,10 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-
-export interface Location {
-  id: string;
-  name: string;
-  code: string;
-  address?: string;
-  phone?: string;
-  email?: string;
-  isActive: boolean;
-}
+import type { Location } from "@shared/schema";
 
 export function useLocationData() {
   const { data: locations = [], isLoading } = useQuery<Location[]>({
-    queryKey: ["/api/locations/active"],
+    queryKey: ["locations", "active"],
   });
 
   return { locations, isLoading };
@@ -23,14 +14,14 @@ export function useCurrentLocation() {
   const [currentLocation, setCurrentLocation] = useState<Location | null>(null);
 
   const { data: locations = [] } = useQuery<Location[]>({
-    queryKey: ["/api/locations/active"],
+    queryKey: ["locations", "active"],
   });
 
   useEffect(() => {
     // Try to get saved location from localStorage
     const savedLocationId = localStorage.getItem("currentLocationId");
     if (savedLocationId && locations.length > 0) {
-      const savedLocation = locations.find(loc => loc.id === savedLocationId);
+      const savedLocation = locations.find((loc) => loc.id === savedLocationId);
       if (savedLocation) {
         setCurrentLocation(savedLocation);
         return;
@@ -54,5 +45,34 @@ export function useCurrentLocation() {
     changeLocation,
     locations,
     isLoading: !locations.length && currentLocation === null,
+  };
+}
+
+export function useLocation() {
+  const { data: locations = [] } = useQuery<Location[]>({
+    queryKey: ["locations", "active"],
+  });
+
+  const [selectedLocation, setSelectedLocation] = useState<string>("");
+
+  useEffect(() => {
+    const savedLocation = localStorage.getItem("selectedLocation");
+    if (savedLocation) {
+      setSelectedLocation(savedLocation);
+    } else {
+      setSelectedLocation("all");
+    }
+  }, []);
+
+  const selectedLocationData =
+    selectedLocation === "all"
+      ? null
+      : locations.find((loc) => loc.id === selectedLocation);
+
+  return {
+    selectedLocation,
+    selectedLocationData,
+    locations,
+    setSelectedLocation,
   };
 }

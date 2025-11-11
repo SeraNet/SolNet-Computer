@@ -1,0 +1,43 @@
+===============================================
+SOLNET DEPLOYMENT - SERVER INFORMATION
+===============================================
+
+CPANEL ACCESS:
+--------------
+URL: https://ouzo.hostns.io/
+Username: your-username
+Password: your-cpanel-password
+
+SSH ACCESS:
+-----------
+Host: ns2.hostns.io (NOT ouzo.hostns.io!)
+Username: solnet (or your username)
+Port: 22 (default)
+Authentication: SSH Key required
+
+IMPORTANT NOTES:
+----------------
+1. For CPanel web access: use ouzo.hostns.io
+2. For SSH access: use ns2.hostns.io
+3. SSH requires key authentication (no passwords)
+4. Easiest method: Use CPanel Terminal (no SSH needed)
+
+WHICH GUIDE TO USE:
+-------------------
+→ See START_HERE.md
+→ For Ouzo HostNS: OUZO_HOSTNS_DEPLOYMENT.md
+→ SSH issues: SSH_SETUP_GUIDE.md
+
+===============================================
+
+
+
+
+
+
+
+
+
+
+
+

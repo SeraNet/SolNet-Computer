@@ -1,0 +1,1656 @@
+import { sql, relations } from "drizzle-orm";
+import {
+  pgTable,
+  text,
+  varchar,
+  integer,
+  decimal,
+  timestamp,
+  boolean,
+  jsonb,
+  pgEnum,
+  serial,
+  date,
+  uuid,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
+import { createInsertSchema } from "drizzle-zod";
+import { z } from "zod";
+
+// Enums
+export const deviceStatusEnum = pgEnum("device_status", [
+  "registered",
+  "diagnosed",
+  "in_progress",
+  "waiting_parts",
+  "completed",
+  "ready_for_pickup",
+  "delivered",
+  "cancelled",
+]);
+
+export const priorityEnum = pgEnum("priority", ["normal", "high", "urgent"]);
+
+export const paymentStatusEnum = pgEnum("payment_status", [
+  "pending",
+  "paid",
+  "partial",
+  "refunded",
+]);
+
+export const appointmentStatusEnum = pgEnum("appointment_status", [
+  "scheduled",
+  "confirmed",
+  "in_progress",
+  "completed",
+  "cancelled",
+]);
+
+export const userRoleEnum = pgEnum("user_role", [
+  "admin",
+  "technician",
+  "sales",
+]);
+
+// Feedback submission schema
+export const feedbackSchema = z.object({
+  deviceId: z.string().min(1, "Device ID is required"),
+  rating: z.number().min(1).max(5, "Rating must be between 1 and 5"),
+  overallSatisfaction: z
+    .number()
+    .min(1)
+    .max(5, "Overall satisfaction must be between 1 and 5"),
+  serviceQuality: z
+    .number()
+    .min(1)
+    .max(5, "Service quality must be between 1 and 5"),
+  communication: z
+    .number()
+    .min(1)
+    .max(5, "Communication must be between 1 and 5"),
+  timeliness: z.number().min(1).max(5, "Timeliness must be between 1 and 5"),
+  valueForMoney: z
+    .number()
+    .min(1)
+    .max(5, "Value for money must be between 1 and 5"),
+  comments: z.string().optional(),
+  wouldRecommend: z.boolean().default(true),
+});
+
+// Locations table for multi-location support
+export const locations = pgTable("locations", {
+  numId: serial("num_id").unique(),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  code: varchar("code", { length: 10 }).notNull().unique(), // Short code like "NYC01", "LA02"
+  address: text("address").notNull(),
+  city: varchar("city").notNull(),
+  state: varchar("state"),
+  zipCode: varchar("zip_code"),
+  country: varchar("country").notNull().default("USA"),
+  phone: varchar("phone"),
+  email: varchar("email"),
+  managerName: varchar("manager_name"),
+  isActive: boolean("is_active").notNull().default(true),
+  timezone: varchar("timezone").default("America/New_York"),
+  businessHours: jsonb("business_hours"), // Store hours as JSON
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Users table
+export const users = pgTable("users", {
+  numId: serial("num_id").unique(),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  username: text("username").notNull().unique(),
+  email: text("email").unique(),
+  password: text("password").notNull(),
+  firstName: varchar("first_name"),
+  lastName: varchar("last_name"),
+  role: userRoleEnum("role").notNull().default("sales"),
+  locationId: varchar("location_id").references(() => locations.id),
+  profilePicture: text("profile_picture"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Business owner profile table
+export const businessProfile = pgTable("business_profile", {
+  numId: serial("num_id").unique(),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  businessName: text("business_name").notNull(),
+  ownerName: text("owner_name").notNull(),
+  email: text("email").notNull(),
+  phone: text("phone").notNull(),
+  address: text("address").notNull(),
+  city: text("city").notNull(),
+  state: text("state").notNull(),
+  zipCode: text("zip_code").notNull(),
+  country: text("country").notNull().default("USA"),
+  website: text("website"),
+  logo: text("logo"),
+  taxId: text("tax_id"),
+  licenseNumber: text("license_number"),
+  businessType: text("business_type").default("Computer Repair Shop"),
+  description: text("description"),
+  establishedDate: date("established_date"),
+  ownerBio: text("owner_bio"),
+  ownerPhoto: text("owner_photo"),
+  yearsOfExperience: text("years_of_experience"),
+  // Landing page statistics (can be manually overridden)
+  totalCustomers: text("total_customers"),
+  totalDevicesRepaired: text("total_devices_repaired"),
+  monthlyAverageRepairs: text("monthly_average_repairs"),
+  customerRetentionRate: text("customer_retention_rate"),
+  averageRepairTime: text("average_repair_time"),
+  warrantyRate: text("warranty_rate"),
+  happyCustomers: text("happy_customers"),
+  averageRating: text("average_rating"),
+  customerSatisfactionRate: text("customer_satisfaction_rate"),
+  // Business goals and targets
+  monthlyRevenueTarget: decimal("monthly_revenue_target", {
+    precision: 10,
+    scale: 2,
+  }),
+  annualRevenueTarget: decimal("annual_revenue_target", {
+    precision: 10,
+    scale: 2,
+  }),
+  growthTargetPercentage: decimal("growth_target_percentage", {
+    precision: 5,
+    scale: 2,
+  }).default("15.00"),
+  specializations: jsonb("specializations"),
+  awards: jsonb("awards"),
+  testimonials: jsonb("testimonials"),
+  workingHours: jsonb("working_hours"),
+  socialLinks: jsonb("social_links"),
+  bankingInfo: jsonb("banking_info"),
+  insuranceInfo: jsonb("insurance_info"),
+  certifications: jsonb("certifications"),
+  publicInfo: jsonb("public_info"),
+  // Landing page content management
+  features: jsonb("features"),
+  teamMembers: jsonb("team_members"),
+  whyChooseUs: jsonb("why_choose_us"),
+  // Mission, Vision & Values
+  mission: text("mission"),
+  vision: text("vision"),
+  values: jsonb("values"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Customers table
+export const customers = pgTable("customers", {
+  numId: serial("num_id").unique(),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  email: text("email"),
+  phone: text("phone").notNull().unique(),
+  address: text("address"),
+  notes: text("notes"),
+  registrationDate: date("registration_date").notNull().defaultNow(), // Date when customer first attended the shop
+  locationId: varchar("location_id").references(() => locations.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Device types, brands, models for reference
+export const deviceTypes = pgTable("device_types", {
+  numId: serial("num_id").unique(),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(),
+  description: text("description"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const brands = pgTable("brands", {
+  numId: serial("num_id").unique(),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(),
+  description: text("description"),
+  website: text("website"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const models = pgTable("models", {
+  numId: serial("num_id").unique(),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  brandId: varchar("brand_id")
+    .references(() => brands.id)
+    .notNull(),
+  deviceTypeId: varchar("device_type_id")
+    .references(() => deviceTypes.id)
+    .notNull(),
+  description: text("description"),
+  specifications: text("specifications"),
+  releaseYear: integer("release_year"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Service types
+export const serviceTypes = pgTable("service_types", {
+  numId: serial("num_id").unique(),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(),
+  description: text("description"),
+  category: text("category").default("General"), // e.g., "Hardware Repair", "Software", "Data Recovery"
+  estimatedDuration: integer("estimated_duration"), // in minutes
+  basePrice: decimal("base_price", { precision: 10, scale: 2 }),
+  isPublic: boolean("is_public").notNull().default(true), // Show on public landing page
+  features: jsonb("features"), // Array of features included in this service
+  requirements: text("requirements"), // Array of requirements or what customer should bring
+  warranty: text("warranty"), // Warranty information
+  imageUrl: text("image_url"), // URL or base64 image for service display
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").default(0), // For ordering on public page
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Enhanced Inventory items with all features from accessories
+export const inventoryItems = pgTable("inventory_items", {
+  numId: serial("num_id").unique(),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  locationId: varchar("location_id").references(() => locations.id),
+  name: text("name").notNull(),
+  sku: text("sku").notNull().unique(),
+  description: text("description"),
+  category: text("category").default("General"),
+  brand: text("brand"),
+  model: text("model"),
+  purchasePrice: decimal("purchase_price", { precision: 10, scale: 2 }),
+  salePrice: decimal("sale_price", { precision: 10, scale: 2 }).notNull(),
+  quantity: integer("quantity").notNull().default(0),
+  minStockLevel: integer("min_stock_level").notNull().default(10),
+  reorderPoint: integer("reorder_point").notNull().default(15),
+  reorderQuantity: integer("reorder_quantity").notNull().default(50),
+  leadTimeDays: integer("lead_time_days").default(7),
+  avgDailySales: decimal("avg_daily_sales", { precision: 8, scale: 2 }).default(
+    "0"
+  ),
+  supplier: text("supplier"),
+  barcode: text("barcode"),
+  // New fields from accessories for public display
+  isPublic: boolean("is_public").notNull().default(true), // Show on public landing page
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").default(0), // For ordering on public page
+  imageUrl: text("image_url"), // URL or base64 image
+  specifications: jsonb("specifications"), // Technical specifications
+  compatibility: jsonb("compatibility"), // Compatible devices/systems
+  warranty: text("warranty"), // Warranty information
+  lastRestocked: timestamp("last_restocked"),
+  predictedStockout: timestamp("predicted_stockout"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Accessories table (for backward compatibility) - now references inventory_items
+export const accessories = pgTable("accessories", {
+  numId: serial("num_id").unique(),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  inventoryItemId: varchar("inventory_item_id")
+    .references(() => inventoryItems.id)
+    .notNull(),
+  // Additional accessory-specific fields if needed
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Categories for services and accessories
+export const categories = pgTable("categories", {
+  numId: serial("num_id").unique(),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  type: text("type").notNull(), // "service" or "accessory"
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Customer feedback for device repairs
+export const deviceFeedback = pgTable("device_feedback", {
+  numId: serial("num_id").unique(),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  deviceId: varchar("device_id")
+    .references(() => devices.id)
+    .notNull(),
+  customerId: varchar("customer_id")
+    .references(() => customers.id)
+    .notNull(),
+  locationId: varchar("location_id").references(() => locations.id),
+  rating: integer("rating").notNull(), // 1-5 stars
+  overallSatisfaction: integer("overall_satisfaction").notNull(), // 1-5 scale
+  serviceQuality: integer("service_quality").notNull(), // 1-5 scale
+  communication: integer("communication").notNull(), // 1-5 scale
+  timeliness: integer("timeliness").notNull(), // 1-5 scale
+  valueForMoney: integer("value_for_money").notNull(), // 1-5 scale
+  comments: text("comments"), // Optional text feedback
+  wouldRecommend: boolean("would_recommend").notNull().default(true),
+  submittedAt: timestamp("submitted_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Message urgency enum
+export const messageUrgencyEnum = pgEnum("message_urgency", [
+  "low",
+  "medium",
+  "high",
+]);
+
+// Message status enum
+export const messageStatusEnum = pgEnum("message_status", [
+  "new",
+  "read",
+  "replied",
+  "closed",
+]);
+
+// Customer messages table for landing page inquiries
+export const customerMessages = pgTable("customer_messages", {
+  numId: serial("num_id").unique(),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  email: text("email").notNull(),
+  phone: text("phone"),
+  subject: text("subject").notNull(),
+  message: text("message").notNull(),
+  serviceType: text("service_type"),
+  urgency: messageUrgencyEnum("urgency").default("medium"),
+  status: messageStatusEnum("status").default("new"),
+  locationId: varchar("location_id").references(() => locations.id),
+  assignedTo: varchar("assigned_to").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Devices (for repair tracking)
+export const devices = pgTable("devices", {
+  numId: serial("num_id").unique(),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  customerId: varchar("customer_id")
+    .references(() => customers.id)
+    .notNull(),
+  locationId: varchar("location_id").references(() => locations.id),
+  deviceTypeId: varchar("device_type_id").references(() => deviceTypes.id),
+  brandId: varchar("brand_id").references(() => brands.id),
+  modelId: varchar("model_id").references(() => models.id),
+  serialNumber: text("serial_number"),
+  receiptNumber: varchar("receipt_number").unique(),
+  problemDescription: text("problem_description").notNull(),
+  serviceTypeId: varchar("service_type_id").references(() => serviceTypes.id),
+  status: deviceStatusEnum("status").notNull().default("registered"),
+  priority: priorityEnum("priority").notNull().default("normal"),
+  estimatedCompletionDate: timestamp("estimated_completion_date"),
+  actualCompletionDate: timestamp("actual_completion_date"),
+  technicianNotes: text("technician_notes"),
+  customerNotes: text("customer_notes"),
+  totalCost: decimal("total_cost", { precision: 10, scale: 2 }),
+  paymentStatus: paymentStatusEnum("payment_status")
+    .notNull()
+    .default("pending"),
+  createdBy: varchar("created_by").references(() => users.id),
+  assignedTo: varchar("assigned_to").references(() => users.id),
+  feedbackRequested: boolean("feedback_requested").notNull().default(false),
+  feedbackSubmitted: boolean("feedback_submitted").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Sales transactions
+export const sales = pgTable("sales", {
+  numId: serial("num_id").unique(),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  customerId: varchar("customer_id").references(() => customers.id),
+  locationId: varchar("location_id").references(() => locations.id),
+  totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
+  taxAmount: decimal("tax_amount", { precision: 10, scale: 2 }).default("0"),
+  discountAmount: decimal("discount_amount", {
+    precision: 10,
+    scale: 2,
+  }).default("0"),
+  paymentMethod: text("payment_method"),
+  paymentStatus: paymentStatusEnum("payment_status").notNull().default("paid"),
+  notes: text("notes"),
+  salesPersonId: varchar("sales_person_id").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Sale items
+export const saleItems = pgTable("sale_items", {
+  numId: serial("num_id").unique(),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  saleId: varchar("sale_id")
+    .references(() => sales.id)
+    .notNull(),
+  inventoryItemId: varchar("inventory_item_id")
+    .references(() => inventoryItems.id)
+    .notNull(),
+  quantity: integer("quantity").notNull(),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+  totalPrice: decimal("total_price", { precision: 10, scale: 2 }).notNull(),
+});
+
+// Appointments
+export const appointments = pgTable("appointments", {
+  numId: serial("num_id").unique(),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  customerId: varchar("customer_id")
+    .references(() => customers.id)
+    .notNull(),
+  locationId: varchar("location_id").references(() => locations.id),
+  title: text("title").notNull(),
+  description: text("description"),
+  appointmentDate: timestamp("appointment_date").notNull(),
+  duration: integer("duration").notNull().default(60), // in minutes
+  status: appointmentStatusEnum("status").notNull().default("scheduled"),
+  assignedTo: varchar("assigned_to").references(() => users.id),
+  notes: text("notes"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Device status history
+export const deviceStatusHistory = pgTable("device_status_history", {
+  numId: serial("num_id").unique(),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  deviceId: varchar("device_id")
+    .references(() => devices.id)
+    .notNull(),
+  oldStatus: deviceStatusEnum("old_status"),
+  newStatus: deviceStatusEnum("new_status").notNull(),
+  notes: text("notes"),
+  changedBy: varchar("changed_by").references(() => users.id),
+  changedAt: timestamp("changed_at").defaultNow(),
+});
+
+// Customer feedback and reviews
+export const customerFeedback = pgTable("customer_feedback", {
+  numId: serial("num_id").unique(),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  customerId: varchar("customer_id").references(() => customers.id), // Optional for landing page feedback
+  deviceId: varchar("device_id").references(() => devices.id),
+  // For landing page feedback (when customerId is null)
+  customerName: text("customer_name"), // For non-registered customers
+  customerEmail: text("customer_email"), // For non-registered customers
+  serviceType: text("service_type"), // For landing page feedback
+  locationId: varchar("location_id").references(() => locations.id), // For landing page feedback
+  // Rating fields
+  rating: integer("rating").notNull(), // 1-5 stars (overall satisfaction)
+  reviewTitle: text("review_title"),
+  reviewText: text("review_text"), // Comments/feedback text
+  serviceQuality: integer("service_quality"), // 1-5
+  speedOfService: integer("speed_of_service"), // 1-5 (timeliness)
+  pricing: integer("pricing"), // 1-5 (value for money)
+  communication: integer("communication"), // 1-5 (for landing page feedback)
+  wouldRecommend: boolean("would_recommend"),
+  isPublic: boolean("is_public").notNull().default(false),
+  respondedAt: timestamp("responded_at"),
+  response: text("response"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Warranties and guarantees
+export const warranties = pgTable("warranties", {
+  numId: serial("num_id").unique(),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  deviceId: varchar("device_id")
+    .references(() => devices.id)
+    .notNull(),
+  warrantyType: text("warranty_type").notNull(), // "repair", "parts", "labor"
+  description: text("description"),
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  terms: text("terms"),
+  isActive: boolean("is_active").notNull().default(true),
+  claimedAt: timestamp("claimed_at"),
+  claimNotes: text("claim_notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Expense categories for better organization
+export const expenseCategories = pgTable("expense_categories", {
+  numId: serial("num_id").unique(),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  color: varchar("color", { length: 7 }), // Hex color code
+  icon: text("icon"), // Icon name for UI
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").default(0),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Expenses and business costs
+export const expenses = pgTable("expenses", {
+  numId: serial("num_id").unique(),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  locationId: varchar("location_id").references(() => locations.id),
+  category: text("category").notNull(), // "rent", "utilities", "supplies", "marketing", etc.
+  description: text("description").notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  expenseDate: timestamp("expense_date").notNull(),
+  vendor: text("vendor"),
+  receiptUrl: text("receipt_url"),
+  notes: text("notes"),
+  expenseType: text("expense_type").default("one-time"), // "daily", "monthly", "yearly", "one-time", "equipment"
+  paymentMethod: text("payment_method").default("cash"), // "cash", "bank-transfer", "check", "credit-card", "mobile-money"
+  isRecurring: boolean("is_recurring").notNull().default(false),
+  recurringFrequency: text("recurring_frequency"), // "monthly", "quarterly", "yearly"
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Loan invoices for payment tracking
+export const loanInvoiceStatusEnum = pgEnum("loan_invoice_status", [
+  "pending",
+  "overdue",
+  "paid",
+  "cancelled",
+]);
+
+export const loanInvoices = pgTable("loan_invoices", {
+  numId: serial("num_id").unique(),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  customerId: varchar("customer_id")
+    .references(() => customers.id)
+    .notNull(),
+  deviceDescription: text("device_description").notNull(),
+  serviceDescription: text("service_description").notNull(),
+  totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
+  paidAmount: decimal("paid_amount", { precision: 10, scale: 2 })
+    .notNull()
+    .default("0"),
+  remainingAmount: decimal("remaining_amount", {
+    precision: 10,
+    scale: 2,
+  }).notNull(),
+  dueDate: timestamp("due_date").notNull(),
+  status: loanInvoiceStatusEnum("status").notNull().default("pending"),
+  notes: text("notes"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const loanInvoicePayments = pgTable("loan_invoice_payments", {
+  numId: serial("num_id").unique(),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  invoiceId: varchar("invoice_id")
+    .references(() => loanInvoices.id)
+    .notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  paymentMethod: text("payment_method").notNull(),
+  notes: text("notes"),
+  recordedBy: varchar("recorded_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Marketing campaigns and promotions
+export const promotions = pgTable("promotions", {
+  numId: serial("num_id").unique(),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  description: text("description"),
+  discountType: text("discount_type").notNull(), // "percentage", "fixed_amount"
+  discountValue: decimal("discount_value", {
+    precision: 10,
+    scale: 2,
+  }).notNull(),
+  minimumAmount: decimal("minimum_amount", { precision: 10, scale: 2 }),
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  usageLimit: integer("usage_limit"),
+  usageCount: integer("usage_count").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+  promotionCode: text("promotion_code").unique(),
+  applicableServices: jsonb("applicable_services"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Supplier management
+export const suppliers = pgTable("suppliers", {
+  numId: serial("num_id").unique(),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  contactPerson: text("contact_person"),
+  email: text("email"),
+  phone: text("phone").notNull(),
+  address: text("address"),
+  city: text("city"),
+  state: text("state"),
+  zipCode: text("zip_code"),
+  country: text("country").default("USA"),
+  website: text("website"),
+  paymentTerms: text("payment_terms"),
+  deliveryTime: integer("delivery_time"), // in days
+  notes: text("notes"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Purchase orders table
+export const purchaseOrders = pgTable("purchase_orders", {
+  numId: serial("num_id").unique(),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  orderNumber: varchar("order_number").notNull().unique(),
+  date: date("date").notNull(),
+  status: varchar("status").notNull().default("draft"), // draft, submitted, approved, received, cancelled
+  supplierId: varchar("supplier_id").references(() => suppliers.id),
+  locationId: varchar("location_id")
+    .references(() => locations.id)
+    .notNull(),
+  createdBy: varchar("created_by")
+    .references(() => users.id)
+    .notNull(),
+  totalItems: integer("total_items").notNull().default(0),
+  totalQuantity: integer("total_quantity").notNull().default(0),
+  totalEstimatedCost: decimal("total_estimated_cost", {
+    precision: 10,
+    scale: 2,
+  })
+    .notNull()
+    .default("0.00"),
+  notes: text("notes"),
+  priority: priorityEnum("priority").notNull().default("normal"),
+  expectedDeliveryDate: date("expected_delivery_date"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Purchase order items table
+export const purchaseOrderItems = pgTable("purchase_order_items", {
+  numId: serial("num_id").unique(),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  purchaseOrderId: varchar("purchase_order_id")
+    .notNull()
+    .references(() => purchaseOrders.id),
+  name: text("name").notNull(), // Actual column name in database
+  sku: varchar("sku"),
+  category: varchar("category"),
+  description: text("description"),
+  currentStock: integer("current_stock").default(0),
+  minStockLevel: integer("min_stock_level").default(0),
+  suggestedQuantity: integer("suggested_quantity").notNull().default(1),
+  estimatedPrice: decimal("estimated_price", { precision: 10, scale: 2 })
+    .notNull()
+    .default("0.00"),
+  supplier: varchar("supplier"),
+  priority: varchar("priority").default("normal"),
+  notes: text("notes"),
+  isExistingItem: boolean("is_existing_item").default(false),
+  // Add missing fields that exist in the actual database
+  inventoryItemId: varchar("inventory_item_id"),
+  itemName: text("item_name").notNull(), // This field is required in the database
+  // Removed createdAt since it doesn't exist in actual table
+});
+
+// System settings table
+export const systemSettings = pgTable("system_settings", {
+  numId: serial("num_id").unique(),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  category: varchar("category").notNull(), // business, security, notifications, etc.
+  key: varchar("key").notNull(),
+  value: jsonb("value").notNull(), // Store any type of value as JSON
+  description: text("description"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// SMS Settings table for storing Twilio configuration
+export const smsSettings = pgTable("sms_settings", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  key: text("key").notNull().unique(),
+  value: text("value"),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Ethiopian SMS Settings table for storing local SMS provider configuration
+export const ethiopianSmsSettings = pgTable("ethiopian_sms_settings", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  provider: text("provider").notNull(), // 'ethio_telecom', 'local_aggregator', 'custom'
+  username: text("username"),
+  password: text("password"),
+  apiKey: text("api_key"),
+  senderId: text("sender_id"),
+  baseUrl: text("base_url"),
+  customEndpoint: text("custom_endpoint"),
+  customHeaders: text("custom_headers"), // JSON string
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// SMS Templates table for storing customizable SMS message templates
+export const smsTemplates = pgTable("sms_templates", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  deviceRegistration: text("device_registration").notNull(),
+  deviceStatusUpdate: text("device_status_update").notNull(),
+  deviceReadyForPickup: text("device_ready_for_pickup").notNull(),
+  language: text("language").notNull().default("amharic"), // 'amharic', 'english', 'mixed'
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// SMS Campaigns table for storing bulk SMS campaign data
+export const smsCampaigns = pgTable("sms_campaigns", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  message: text("message").notNull(),
+  occasion: text("occasion").notNull(),
+  customOccasion: text("custom_occasion"),
+  scheduledDate: timestamp("scheduled_date"),
+  targetGroup: text("target_group").notNull(),
+  customFilters: jsonb("custom_filters"),
+  status: text("status").notNull().default("draft"), // 'draft', 'scheduled', 'sending', 'completed', 'failed'
+  sentCount: integer("sent_count").default(0),
+  totalCount: integer("total_count").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  sentAt: timestamp("sent_at"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// SMS Campaign Recipients table to track individual SMS sends
+export const smsCampaignRecipients = pgTable("sms_campaign_recipients", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  campaignId: varchar("campaign_id")
+    .notNull()
+    .references(() => smsCampaigns.id, { onDelete: "cascade" }),
+  customerId: varchar("customer_id").notNull(),
+  customerName: text("customer_name").notNull(),
+  customerPhone: text("customer_phone").notNull(),
+  message: text("message").notNull(),
+  status: text("status").notNull().default("pending"), // 'pending', 'sent', 'failed', 'delivered'
+  sentAt: timestamp("sent_at"),
+  deliveredAt: timestamp("delivered_at"),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Budgets table for manual budget allocations (by expense type or category)
+export const budgets = pgTable("budgets", {
+  numId: serial("num_id").unique(),
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  locationId: varchar("location_id").references(() => locations.id),
+  // Either expenseType (daily, monthly, yearly, one-time, equipment) or category (e.g., rent, utilities)
+  expenseType: text("expense_type"),
+  category: text("category"),
+  month: integer("month"), // 1-12; if null, applies to all months of the year
+  year: integer("year").notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  notes: text("notes"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Relations
+export const locationsRelations = relations(locations, ({ many }) => ({
+  users: many(users),
+  devices: many(devices),
+  inventoryItems: many(inventoryItems),
+  sales: many(sales),
+  appointments: many(appointments),
+}));
+
+export const customersRelations = relations(customers, ({ many }) => ({
+  devices: many(devices),
+  sales: many(sales),
+  appointments: many(appointments),
+}));
+
+export const devicesRelations = relations(devices, ({ one, many }) => ({
+  customer: one(customers, {
+    fields: [devices.customerId],
+    references: [customers.id],
+  }),
+  location: one(locations, {
+    fields: [devices.locationId],
+    references: [locations.id],
+  }),
+  deviceType: one(deviceTypes, {
+    fields: [devices.deviceTypeId],
+    references: [deviceTypes.id],
+  }),
+  brand: one(brands, {
+    fields: [devices.brandId],
+    references: [brands.id],
+  }),
+  model: one(models, {
+    fields: [devices.modelId],
+    references: [models.id],
+  }),
+  serviceType: one(serviceTypes, {
+    fields: [devices.serviceTypeId],
+    references: [serviceTypes.id],
+  }),
+  createdByUser: one(users, {
+    fields: [devices.createdBy],
+    references: [users.id],
+  }),
+  assignedToUser: one(users, {
+    fields: [devices.assignedTo],
+    references: [users.id],
+  }),
+  statusHistory: many(deviceStatusHistory),
+}));
+
+export const salesRelations = relations(sales, ({ one, many }) => ({
+  customer: one(customers, {
+    fields: [sales.customerId],
+    references: [customers.id],
+  }),
+  salesPerson: one(users, {
+    fields: [sales.salesPersonId],
+    references: [users.id],
+  }),
+  items: many(saleItems),
+}));
+
+export const saleItemsRelations = relations(saleItems, ({ one }) => ({
+  sale: one(sales, {
+    fields: [saleItems.saleId],
+    references: [sales.id],
+  }),
+  inventoryItem: one(inventoryItems, {
+    fields: [saleItems.inventoryItemId],
+    references: [inventoryItems.id],
+  }),
+}));
+
+export const appointmentsRelations = relations(appointments, ({ one }) => ({
+  customer: one(customers, {
+    fields: [appointments.customerId],
+    references: [customers.id],
+  }),
+  assignedToUser: one(users, {
+    fields: [appointments.assignedTo],
+    references: [users.id],
+  }),
+  createdByUser: one(users, {
+    fields: [appointments.createdBy],
+    references: [users.id],
+  }),
+}));
+
+export const brandsRelations = relations(brands, ({ many }) => ({
+  models: many(models),
+  devices: many(devices),
+}));
+
+export const modelsRelations = relations(models, ({ one, many }) => ({
+  brand: one(brands, {
+    fields: [models.brandId],
+    references: [brands.id],
+  }),
+  deviceType: one(deviceTypes, {
+    fields: [models.deviceTypeId],
+    references: [deviceTypes.id],
+  }),
+  devices: many(devices),
+}));
+
+export const purchaseOrdersRelations = relations(
+  purchaseOrders,
+  ({ one, many }) => ({
+    // Temporarily commented out supplier relation to debug
+    // supplier: one(suppliers, {
+    //   fields: [purchaseOrders.supplierId],
+    //   references: [suppliers.id],
+    // }),
+    location: one(locations, {
+      fields: [purchaseOrders.locationId],
+      references: [locations.id],
+    }),
+    createdByUser: one(users, {
+      fields: [purchaseOrders.createdBy],
+      references: [users.id],
+    }),
+    items: many(purchaseOrderItems),
+  })
+);
+
+export const purchaseOrderItemsRelations = relations(
+  purchaseOrderItems,
+  ({ one }) => ({
+    purchaseOrder: one(purchaseOrders, {
+      fields: [purchaseOrderItems.purchaseOrderId],
+      references: [purchaseOrders.id],
+    }),
+    // Removed inventoryItem relation since inventoryItemId doesn't exist in actual table
+  })
+);
+
+// Insert schemas
+export const insertLocationSchema = createInsertSchema(locations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertUserSchema = createInsertSchema(users).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertCustomerSchema = createInsertSchema(customers)
+  .omit({
+    id: true,
+    createdAt: true,
+    updatedAt: true,
+  })
+  .extend({
+    name: z
+      .string()
+      .min(2, "Customer name must be at least 2 characters")
+      .refine(
+        (val) => val.trim().length >= 2,
+        "Customer name cannot be empty spaces"
+      ),
+    phone: z
+      .string()
+      .min(10, "Phone number must be at least 10 digits")
+      .refine(
+        (val) => val.trim().length >= 10,
+        "Phone number cannot be empty spaces"
+      ),
+    email: z
+      .string()
+      .optional()
+      .nullable()
+      .refine(
+        (val) =>
+          !val ||
+          val.trim() === "" ||
+          /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val.trim()),
+        "Email must be valid format or empty"
+      ),
+  });
+
+export const insertDeviceSchema = createInsertSchema(devices).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertSaleSchema = createInsertSchema(sales).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertSaleItemSchema = createInsertSchema(saleItems).omit({
+  id: true,
+  saleId: true, // saleId is added by the backend during creation
+});
+
+export const insertAppointmentSchema = createInsertSchema(appointments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertDeviceTypeSchema = createInsertSchema(deviceTypes)
+  .omit({
+    id: true,
+    createdAt: true,
+  })
+  .extend({
+    name: z.string().min(1, "Device type name is required"),
+    description: z.string().optional(),
+    isActive: z.boolean().default(true),
+  });
+
+export const insertBrandSchema = createInsertSchema(brands)
+  .omit({
+    id: true,
+    createdAt: true,
+  })
+  .extend({
+    name: z.string().min(1, "Brand name is required"),
+    description: z.string().optional(),
+    website: z.string().url().optional().or(z.literal("")),
+    isActive: z.boolean().default(true),
+  });
+
+export const insertModelSchema = createInsertSchema(models)
+  .omit({
+    id: true,
+    createdAt: true,
+  })
+  .extend({
+    name: z.string().min(1, "Model name is required"),
+    brandId: z.string().min(1, "Brand is required"),
+    deviceTypeId: z.string().min(1, "Device type is required"),
+    description: z.string().optional(),
+    specifications: z.string().optional(),
+    releaseYear: z
+      .number()
+      .min(1970)
+      .max(new Date().getFullYear() + 1)
+      .optional(),
+    isActive: z.boolean().default(true),
+  });
+
+export const insertServiceTypeSchema = createInsertSchema(serviceTypes)
+  .omit({
+    id: true,
+    createdAt: true,
+    updatedAt: true,
+  })
+  .extend({
+    name: z.string().min(1, "Service name is required"),
+    description: z.string().optional(),
+    category: z.string().min(1, "Category is required"),
+    estimatedDuration: z.number().optional(),
+    basePrice: z.union([z.string(), z.number()]).optional(),
+    isPublic: z.boolean().default(true),
+    features: z.array(z.string()).optional(),
+    requirements: z.array(z.string()).optional(),
+    warranty: z.string().optional(),
+    imageUrl: z.string().optional(),
+    isActive: z.boolean().default(true),
+    sortOrder: z.number().default(0),
+  });
+
+export const insertInventoryItemSchema = createInsertSchema(inventoryItems)
+  .omit({
+    id: true,
+    createdAt: true,
+    updatedAt: true,
+  })
+  .extend({
+    name: z.string().min(1, "Item name is required"),
+    sku: z.string().min(1, "SKU is required"),
+    description: z.string().optional(),
+    category: z.string().min(1, "Category is required"),
+    brand: z.string().optional(),
+    model: z.string().optional(),
+    purchasePrice: z.union([z.string(), z.number()]).optional(),
+    salePrice: z
+      .union([z.string(), z.number()])
+      .refine(
+        (val) => val !== undefined && val !== null && val !== "",
+        "Sale price is required"
+      ),
+    quantity: z.number().min(0, "Quantity must be 0 or greater"),
+    minStockLevel: z
+      .number()
+      .min(0, "Minimum stock level must be 0 or greater"),
+    reorderPoint: z.number().min(0, "Reorder point must be 0 or greater"),
+    reorderQuantity: z.number().min(1, "Reorder quantity must be at least 1"),
+    isPublic: z.boolean().default(true),
+    isActive: z.boolean().default(true),
+    sortOrder: z.number().default(0),
+    imageUrl: z.string().optional(),
+    specifications: z.record(z.any()).optional(),
+    compatibility: z.array(z.string()).optional(),
+    warranty: z.string().optional(),
+  });
+
+export const insertBusinessProfileSchema = createInsertSchema(businessProfile)
+  .omit({
+    id: true,
+    numId: true,
+    createdAt: true,
+    updatedAt: true,
+  })
+  .extend({
+    monthlyRevenueTarget: z.number().nullable(),
+    annualRevenueTarget: z.number().nullable(),
+    growthTargetPercentage: z.number().nullable(),
+  });
+
+export const insertCustomerFeedbackSchema = createInsertSchema(
+  customerFeedback
+).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCustomerMessageSchema = createInsertSchema(
+  customerMessages
+).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertWarrantySchema = createInsertSchema(warranties).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertExpenseCategorySchema =
+  createInsertSchema(expenseCategories);
+export const insertExpenseSchema = createInsertSchema(expenses)
+  .omit({
+    id: true,
+    createdAt: true,
+  })
+  .extend({
+    expenseDate: z.coerce.date(), // Allow string to date conversion
+    amount: z.string(), // Explicitly set amount as string
+  });
+
+export const insertPromotionSchema = createInsertSchema(promotions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertSupplierSchema = createInsertSchema(suppliers).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertPurchaseOrderSchema = createInsertSchema(
+  purchaseOrders
+).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertPurchaseOrderItemSchema = createInsertSchema(
+  purchaseOrderItems
+).omit({
+  id: true,
+});
+
+export const insertSystemSettingsSchema = createInsertSchema(
+  systemSettings
+).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Testimonial schema for structured testimonials
+export const testimonialSchema = z.object({
+  id: z.string().default(() => crypto.randomUUID()),
+  customerName: z.string().min(1, "Customer name is required"),
+  customerPhoto: z.string().optional(), // Base64 image or URL
+  testimonial: z.string().min(1, "Testimonial text is required"),
+  rating: z.number().min(1).max(5).default(5),
+  service: z.string().optional(), // What service they received
+  date: z.date().default(() => new Date()),
+  isVerified: z.boolean().default(true),
+});
+
+// Category schemas for service and accessory categories
+export const categorySchema = z.object({
+  id: z.string().default(() => crypto.randomUUID()),
+  name: z.string().min(1, "Category name is required"),
+  type: z.enum(["service", "accessory"]),
+  isActive: z.boolean().default(true),
+  sortOrder: z.number().default(0),
+  createdAt: z.date().default(() => new Date()),
+  updatedAt: z.date().default(() => new Date()),
+});
+
+export const insertCategorySchema = categorySchema.omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertCategoryTableSchema = createInsertSchema(categories).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertLoanInvoiceSchema = createInsertSchema(loanInvoices).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Types
+export type Location = typeof locations.$inferSelect;
+export type InsertLocation = z.infer<typeof insertLocationSchema>;
+
+export type User = typeof users.$inferSelect;
+export type InsertUser = z.infer<typeof insertUserSchema>;
+
+export type Customer = typeof customers.$inferSelect;
+export type InsertCustomer = z.infer<typeof insertCustomerSchema>;
+
+export type Device = typeof devices.$inferSelect;
+export type InsertDevice = z.infer<typeof insertDeviceSchema>;
+
+export type InventoryItem = typeof inventoryItems.$inferSelect;
+export type InsertInventoryItem = z.infer<typeof insertInventoryItemSchema>;
+
+export type Sale = typeof sales.$inferSelect;
+export type InsertSale = z.infer<typeof insertSaleSchema>;
+
+export type SaleItem = typeof saleItems.$inferSelect;
+export type InsertSaleItem = z.infer<typeof insertSaleItemSchema>;
+
+export type Appointment = typeof appointments.$inferSelect;
+export type InsertAppointment = z.infer<typeof insertAppointmentSchema>;
+
+export type DeviceType = typeof deviceTypes.$inferSelect;
+export type InsertDeviceType = z.infer<typeof insertDeviceTypeSchema>;
+
+export type Brand = typeof brands.$inferSelect;
+export type InsertBrand = z.infer<typeof insertBrandSchema>;
+
+export type Model = typeof models.$inferSelect;
+export type InsertModel = z.infer<typeof insertModelSchema>;
+
+export type ServiceType = typeof serviceTypes.$inferSelect;
+export type InsertServiceType = z.infer<typeof insertServiceTypeSchema>;
+
+export type BusinessProfile = typeof businessProfile.$inferSelect;
+export type InsertBusinessProfile = z.infer<typeof insertBusinessProfileSchema>;
+
+export type CustomerFeedback = typeof customerFeedback.$inferSelect;
+export type InsertCustomerFeedback = z.infer<
+  typeof insertCustomerFeedbackSchema
+>;
+
+export type CustomerMessage = typeof customerMessages.$inferSelect;
+export type InsertCustomerMessage = z.infer<typeof insertCustomerMessageSchema>;
+
+export type Warranty = typeof warranties.$inferSelect;
+export type InsertWarranty = z.infer<typeof insertWarrantySchema>;
+
+export type ExpenseCategory = typeof expenseCategories.$inferSelect;
+export type InsertExpenseCategory = z.infer<typeof insertExpenseCategorySchema>;
+export type Expense = typeof expenses.$inferSelect;
+export type InsertExpense = z.infer<typeof insertExpenseSchema>;
+
+export type Promotion = typeof promotions.$inferSelect;
+export type InsertPromotion = z.infer<typeof insertPromotionSchema>;
+
+export type Supplier = typeof suppliers.$inferSelect;
+export type InsertSupplier = z.infer<typeof insertSupplierSchema>;
+
+export type PurchaseOrder = typeof purchaseOrders.$inferSelect;
+export type InsertPurchaseOrder = z.infer<typeof insertPurchaseOrderSchema>;
+
+export type PurchaseOrderItem = typeof purchaseOrderItems.$inferSelect;
+export type InsertPurchaseOrderItem = z.infer<
+  typeof insertPurchaseOrderItemSchema
+>;
+
+export type SystemSetting = typeof systemSettings.$inferSelect;
+export type InsertSystemSetting = z.infer<typeof insertSystemSettingsSchema>;
+
+export type LoanInvoice = typeof loanInvoices.$inferSelect;
+export type InsertLoanInvoice = z.infer<typeof insertLoanInvoiceSchema>;
+
+export type Testimonial = z.infer<typeof testimonialSchema>;
+
+export type Category = typeof categories.$inferSelect;
+export type InsertCategory = z.infer<typeof insertCategorySchema>;
+
+// Smart inventory prediction types
+export type InventoryPrediction = {
+  itemId: string;
+  currentStock: number;
+  predictedStockout: Date | null;
+  daysUntilStockout: number;
+  suggestedReorderQuantity: number;
+  avgDailySales: number;
+  riskLevel: "low" | "medium" | "high" | "critical";
+};
+
+export type StockAlert = {
+  id: string;
+  itemId: string;
+  itemName: string;
+  alertType: "low_stock" | "predicted_stockout" | "reorder_required";
+  message: string;
+  priority: "low" | "medium" | "high" | "critical";
+  createdAt: Date;
+  acknowledged: boolean;
+};
+
+// Recipient Groups table for storing customer groups
+export const recipientGroups = pgTable("recipient_groups", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull().unique(),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Recipient Group Members table to link customers to groups
+export const recipientGroupMembers = pgTable(
+  "recipient_group_members",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    groupId: uuid("group_id")
+      .notNull()
+      .references(() => recipientGroups.id, { onDelete: "cascade" }),
+    customerId: varchar("customer_id")
+      .notNull()
+      .references(() => customers.id, { onDelete: "cascade" }),
+    addedAt: timestamp("added_at").defaultNow(),
+  },
+  (t) => ({
+    // prevent duplicate membership
+    groupCustomerUnique: uniqueIndex(
+      "recipient_group_members_group_customer_unique"
+    ).on(t.groupId, t.customerId),
+  })
+);
+
+export type RecipientGroup = typeof recipientGroups.$inferSelect;
+export type InsertRecipientGroup = typeof recipientGroups.$inferInsert;
+export type RecipientGroupMember = typeof recipientGroupMembers.$inferSelect;
+export type InsertRecipientGroupMember =
+  typeof recipientGroupMembers.$inferInsert;
+
+// Predefined Problems table for device registration
+export const predefinedProblems = pgTable("predefined_problems", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  description: text("description"),
+  category: text("category").notNull().default("General"), // e.g., "Hardware", "Software", "Network", "Battery", "Screen"
+  severity: text("severity").notNull().default("medium"), // "low", "medium", "high", "critical"
+  estimatedCost: decimal("estimated_cost", { precision: 10, scale: 2 }),
+  estimatedDuration: integer("estimated_duration"), // in minutes
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Device Problems junction table to link devices with predefined problems
+export const deviceProblems = pgTable("device_problems", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  deviceId: varchar("device_id")
+    .notNull()
+    .references(() => devices.id, { onDelete: "cascade" }),
+  problemId: uuid("problem_id")
+    .notNull()
+    .references(() => predefinedProblems.id, { onDelete: "cascade" }),
+  customDescription: text("custom_description"), // Allow custom description for this specific instance
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type PredefinedProblem = typeof predefinedProblems.$inferSelect;
+export type InsertPredefinedProblem = typeof predefinedProblems.$inferInsert;
+export type DeviceProblem = typeof deviceProblems.$inferSelect;
+export type InsertDeviceProblem = typeof deviceProblems.$inferInsert;
+
+// Schema validation for predefined problems
+export const insertPredefinedProblemSchema = createInsertSchema(
+  predefinedProblems
+).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertDeviceProblemSchema = createInsertSchema(
+  deviceProblems
+).omit({
+  id: true,
+  createdAt: true,
+});
+
+// Notification system tables
+export const notificationTypes = pgTable("notification_types", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull().unique(),
+  description: text("description"),
+  category: text("category").notNull(), // system, device, inventory, sales, etc.
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const notifications = pgTable("notifications", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  typeId: uuid("type_id")
+    .notNull()
+    .references(() => notificationTypes.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  data: jsonb("data"), // Additional data for the notification
+  priority: text("priority").notNull().default("normal"), // low, normal, high, urgent
+  status: text("status").notNull().default("unread"), // unread, read, archived
+  recipientId: varchar("recipient_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  senderId: varchar("sender_id").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  relatedEntityType: text("related_entity_type"), // device, customer, inventory, etc.
+  relatedEntityId: text("related_entity_id"), // ID of the related entity
+  readAt: timestamp("read_at"),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const notificationPreferences = pgTable("notification_preferences", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: varchar("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  typeId: uuid("type_id")
+    .notNull()
+    .references(() => notificationTypes.id, { onDelete: "cascade" }),
+  emailEnabled: boolean("email_enabled").notNull().default(true),
+  smsEnabled: boolean("sms_enabled").notNull().default(false),
+  pushEnabled: boolean("push_enabled").notNull().default(true),
+  inAppEnabled: boolean("in_app_enabled").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Notification templates for different types
+export const notificationTemplates = pgTable("notification_templates", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  typeId: uuid("type_id")
+    .notNull()
+    .references(() => notificationTypes.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  emailSubject: text("email_subject"),
+  emailBody: text("email_body"),
+  smsMessage: text("sms_message"),
+  variables: jsonb("variables"), // Template variables like {customerName}, {deviceType}, etc.
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Types for notifications
+export type NotificationType = typeof notificationTypes.$inferSelect;
+export type InsertNotificationType = typeof notificationTypes.$inferInsert;
+export type Notification = typeof notifications.$inferSelect;
+export type InsertNotification = typeof notifications.$inferInsert;
+export type NotificationPreference =
+  typeof notificationPreferences.$inferSelect;
+export type InsertNotificationPreference =
+  typeof notificationPreferences.$inferInsert;
+export type NotificationTemplate = typeof notificationTemplates.$inferSelect;
+export type InsertNotificationTemplate =
+  typeof notificationTemplates.$inferInsert;
+
+// Schema validation for notifications
+export const insertNotificationTypeSchema = createInsertSchema(
+  notificationTypes
+).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertNotificationSchema = createInsertSchema(notifications).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertNotificationPreferenceSchema = createInsertSchema(
+  notificationPreferences
+).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertNotificationTemplateSchema = createInsertSchema(
+  notificationTemplates
+).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Relations
+export const notificationTypeRelations = relations(
+  notificationTypes,
+  ({ many }) => ({
+    notifications: many(notifications),
+    preferences: many(notificationPreferences),
+    templates: many(notificationTemplates),
+  })
+);
+
+export const notificationRelations = relations(notifications, ({ one }) => ({
+  type: one(notificationTypes, {
+    fields: [notifications.typeId],
+    references: [notificationTypes.id],
+  }),
+  recipient: one(users, {
+    fields: [notifications.recipientId],
+    references: [users.id],
+  }),
+  sender: one(users, {
+    fields: [notifications.senderId],
+    references: [users.id],
+  }),
+}));
+
+export const notificationPreferenceRelations = relations(
+  notificationPreferences,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [notificationPreferences.userId],
+      references: [users.id],
+    }),
+    type: one(notificationTypes, {
+      fields: [notificationPreferences.typeId],
+      references: [notificationTypes.id],
+    }),
+  })
+);
+
+export const notificationTemplateRelations = relations(
+  notificationTemplates,
+  ({ one }) => ({
+    type: one(notificationTypes, {
+      fields: [notificationTemplates.typeId],
+      references: [notificationTypes.id],
+    }),
+  })
+);
+
+// Budget insert schema and types
+export const insertBudgetSchema = createInsertSchema(budgets)
+  .omit({ id: true, createdAt: true, updatedAt: true })
+  .extend({
+    amount: z.union([z.string(), z.number()]),
+    month: z.number().min(1).max(12).optional().nullable(),
+    expenseType: z.string().optional().nullable(),
+    category: z.string().optional().nullable(),
+  });
+
+export type Budget = typeof budgets.$inferSelect;
+export type InsertBudget = z.infer<typeof insertBudgetSchema>;

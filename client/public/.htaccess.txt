@@ -1,0 +1,44 @@
+Options -MultiViews
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # Never rewrite existing files or directories
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # Explicitly allow static asset paths to pass through
+  RewriteRule ^assets/ - [L,NC]
+  RewriteRule ^favicon\.ico$ - [L]
+  RewriteRule ^robots\.txt$ - [L]
+  RewriteRule ^manifest\.webmanifest$ - [L]
+  RewriteRule ^service-worker\.js$ - [L]
+
+  # Do NOT rewrite API requests; let Apache return 404 or proxy via another config
+  RewriteRule ^api/ - [L]
+
+  # SPA fallback
+  RewriteRule ^ index.html [L]
+</IfModule>
+
+# Ensure correct content types
+AddType application/javascript .js
+AddType text/css .css
+AddType application/wasm .wasm
+
+# Safe compression
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css application/javascript application/json
+</IfModule>
+
+# Basic caching for static assets
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType text/css "access plus 1 month"
+  ExpiresByType application/javascript "access plus 1 month"
+  ExpiresByType image/* "access plus 1 month"
+</IfModule>
+
+

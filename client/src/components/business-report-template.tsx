@@ -1,15 +1,21 @@
 import { Building2, Mail, Phone, MapPin, Globe, FileText } from "lucide-react";
 import { type BusinessProfile } from "@shared/schema";
+import IconLogoDisplay from "./icon-logo-display";
 
 interface BusinessReportTemplateProps {
   profile: BusinessProfile;
 }
 
-export function BusinessReportTemplate({ profile }: BusinessReportTemplateProps) {
+export function BusinessReportTemplate({
+  profile,
+}: BusinessReportTemplateProps) {
   const currentDate = new Date().toLocaleDateString();
 
   return (
-    <div className="business-report-print bg-white p-8 max-w-4xl mx-auto" style={{ color: 'black', background: 'white' }}>
+    <div
+      className="business-report-print bg-white p-8 max-w-4xl mx-auto"
+      style={{ color: "black", background: "white" }}
+    >
       <style>{`
         @media print {
           body * {
@@ -34,21 +40,29 @@ export function BusinessReportTemplate({ profile }: BusinessReportTemplateProps)
           }
         }
       `}</style>
-      
+
       {/* Header */}
       <div className="border-b-2 border-gray-200 pb-6 mb-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            {profile.logo && (
-              <img src={profile.logo} alt="Logo" className="w-16 h-16 rounded-lg object-cover" />
-            )}
+            <IconLogoDisplay
+              width={64}
+              height={64}
+              className="rounded-lg"
+              showFallback={true}
+              fallbackText="SN"
+            />
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">{profile.businessName}</h1>
+              <h1 className="text-3xl font-bold text-gray-900">
+                {profile.businessName}
+              </h1>
               <p className="text-lg text-gray-600">{profile.businessType}</p>
             </div>
           </div>
           <div className="text-right">
-            <h2 className="text-xl font-semibold text-gray-900">Business Report</h2>
+            <h2 className="text-xl font-semibold text-gray-900">
+              Business Report
+            </h2>
             <p className="text-gray-600">Generated on {currentDate}</p>
           </div>
         </div>
@@ -102,8 +116,10 @@ export function BusinessReportTemplate({ profile }: BusinessReportTemplateProps)
         </h3>
         <div className="bg-gray-50 p-4 rounded-lg">
           <p className="text-gray-900">
-            {profile.address}<br />
-            {profile.city}, {profile.state} {profile.zipCode}<br />
+            {profile.address}
+            <br />
+            {profile.city}, {profile.state} {profile.zipCode}
+            <br />
             {profile.country}
           </p>
         </div>
@@ -122,7 +138,9 @@ export function BusinessReportTemplate({ profile }: BusinessReportTemplateProps)
           </div>
           <div>
             <p className="font-medium text-gray-700">Business License:</p>
-            <p className="text-gray-900">{profile.licenseNumber || "Not provided"}</p>
+            <p className="text-gray-900">
+              {profile.licenseNumber || "Not provided"}
+            </p>
           </div>
         </div>
       </section>
@@ -130,7 +148,9 @@ export function BusinessReportTemplate({ profile }: BusinessReportTemplateProps)
       {/* Business Description */}
       {profile.description && (
         <section className="mb-8">
-          <h3 className="text-xl font-semibold text-gray-900 mb-4">Business Description</h3>
+          <h3 className="text-xl font-semibold text-gray-900 mb-4">
+            Business Description
+          </h3>
           <div className="bg-gray-50 p-4 rounded-lg">
             <p className="text-gray-900">{profile.description}</p>
           </div>
@@ -140,8 +160,14 @@ export function BusinessReportTemplate({ profile }: BusinessReportTemplateProps)
       {/* Footer */}
       <div className="border-t-2 border-gray-200 pt-6 mt-8">
         <div className="text-center text-gray-600">
-          <p>This report was generated automatically by LeulNet Business Management System</p>
-          <p className="text-sm mt-2">© {new Date().getFullYear()} {profile.businessName}. All rights reserved.</p>
+          <p>
+            This report was generated automatically by SolNet Business
+            Management System
+          </p>
+          <p className="text-sm mt-2">
+            © {new Date().getFullYear()} {profile.businessName}. All rights
+            reserved.
+          </p>
         </div>
       </div>
     </div>

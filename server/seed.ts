@@ -1,139 +1,180 @@
 import { db } from "./db";
-import { 
-  users, 
-  customers, 
-  deviceTypes, 
-  brands, 
-  models, 
-  serviceTypes, 
+import bcrypt from "bcryptjs";
+import {
+  users,
+  customers,
+  deviceTypes,
+  brands,
+  models,
+  serviceTypes,
   inventoryItems,
   devices,
   sales,
-  saleItems
+  saleItems,
 } from "@shared/schema";
-
 export async function seedDatabase() {
-  console.log("Starting database seeding...");
-
   try {
     // Seed Users
-    const adminUser = await db.insert(users).values({
-      username: "admin",
-      email: "admin@leulnet.com",
-      password: "admin123", // In production, this should be hashed
-      firstName: "Admin",
-      lastName: "User",
-      role: "admin",
-    }).returning();
-
-    const techUser = await db.insert(users).values({
-      username: "tech1",
-      email: "tech@leulnet.com", 
-      password: "tech123",
-      firstName: "John",
-      lastName: "Technician",
-      role: "technician",
-    }).returning();
-
-    const salesUser = await db.insert(users).values({
-      username: "sales1",
-      email: "sales@leulnet.com",
-      password: "sales123", 
-      firstName: "Jane",
-      lastName: "Sales",
-      role: "sales",
-    }).returning();
-
-    console.log("✓ Users seeded");
-
+    const adminUser = await db
+      .insert(users)
+      .values({
+        username: "admin",
+        email: "admin@solnetcomputer.com",
+        password: bcrypt.hashSync("admin123", 10), // Hash the password
+        firstName: "Admin",
+        lastName: "User",
+        role: "admin",
+      })
+      .returning();
+    const techUser = await db
+      .insert(users)
+      .values({
+        username: "tech1",
+        email: "tech@solnetcomputer.com",
+        password: bcrypt.hashSync("tech123", 10), // Hash the password
+        firstName: "John",
+        lastName: "Technician",
+        role: "technician",
+      })
+      .returning();
+    const salesUser = await db
+      .insert(users)
+      .values({
+        username: "sales1",
+        email: "sales@solnetcomputer.com",
+        password: bcrypt.hashSync("sales123", 10), // Hash the password
+        firstName: "Jane",
+        lastName: "Sales",
+        role: "sales",
+      })
+      .returning();
     // Seed Device Types
-    const laptopType = await db.insert(deviceTypes).values({
-      name: "Laptop",
-      description: "Portable computers including notebooks and ultrabooks",
-    }).returning();
-
-    const desktopType = await db.insert(deviceTypes).values({
-      name: "Desktop",
-      description: "Desktop computers and workstations",
-    }).returning();
-
-    const smartphoneType = await db.insert(deviceTypes).values({
-      name: "Smartphone", 
-      description: "Mobile phones and smartphones",
-    }).returning();
-
-    const tabletType = await db.insert(deviceTypes).values({
-      name: "Tablet",
-      description: "Tablet computers and iPads",
-    }).returning();
-
-    console.log("✓ Device types seeded");
-
+    const laptopType = await db
+      .insert(deviceTypes)
+      .values({
+        name: "Laptop",
+        description: "Portable computers including notebooks and ultrabooks",
+        category: "Computers",
+      })
+      .returning();
+    const desktopType = await db
+      .insert(deviceTypes)
+      .values({
+        name: "Desktop",
+        description: "Desktop computers and workstations",
+        category: "Computers",
+      })
+      .returning();
+    const smartphoneType = await db
+      .insert(deviceTypes)
+      .values({
+        name: "Smartphone",
+        description: "Mobile phones and smartphones",
+        category: "Mobile Devices",
+      })
+      .returning();
+    const tabletType = await db
+      .insert(deviceTypes)
+      .values({
+        name: "Tablet",
+        description: "Tablet computers and iPads",
+        category: "Mobile Devices",
+      })
+      .returning();
     // Seed Brands
-    const appleBrand = await db.insert(brands).values({
-      name: "Apple",
-    }).returning();
-
-    const dellBrand = await db.insert(brands).values({
-      name: "Dell",
-    }).returning();
-
-    const hpBrand = await db.insert(brands).values({
-      name: "HP",
-    }).returning();
-
-    const lenovoBrand = await db.insert(brands).values({
-      name: "Lenovo",
-    }).returning();
-
-    const samsungBrand = await db.insert(brands).values({
-      name: "Samsung",
-    }).returning();
-
-    console.log("✓ Brands seeded");
-
+    const appleBrand = await db
+      .insert(brands)
+      .values({
+        name: "Apple",
+      })
+      .returning();
+    const dellBrand = await db
+      .insert(brands)
+      .values({
+        name: "Dell",
+      })
+      .returning();
+    const hpBrand = await db
+      .insert(brands)
+      .values({
+        name: "HP",
+      })
+      .returning();
+    const lenovoBrand = await db
+      .insert(brands)
+      .values({
+        name: "Lenovo",
+      })
+      .returning();
+    const samsungBrand = await db
+      .insert(brands)
+      .values({
+        name: "Samsung",
+      })
+      .returning();
     // Seed Models
     await db.insert(models).values([
       {
-        name: "MacBook Pro 13\"",
+        name: 'MacBook Pro 13"',
         brandId: appleBrand[0].id,
         deviceTypeId: laptopType[0].id,
-        specifications: { screen: "13 inch", processor: "M1", ram: "8GB" },
+        specifications: JSON.stringify({
+          screen: "13 inch",
+          processor: "M1",
+          ram: "8GB",
+        }),
       },
       {
-        name: "MacBook Pro 16\"", 
+        name: 'MacBook Pro 16"',
         brandId: appleBrand[0].id,
         deviceTypeId: laptopType[0].id,
-        specifications: { screen: "16 inch", processor: "M1 Pro", ram: "16GB" },
+        specifications: JSON.stringify({
+          screen: "16 inch",
+          processor: "M1 Pro",
+          ram: "16GB",
+        }),
       },
       {
         name: "iPhone 14",
         brandId: appleBrand[0].id,
         deviceTypeId: smartphoneType[0].id,
-        specifications: { screen: "6.1 inch", storage: "128GB", color: "Blue" },
+        specifications: JSON.stringify({
+          screen: "6.1 inch",
+          storage: "128GB",
+          color: "Blue",
+        }),
       },
       {
-        name: "iPad Pro", 
+        name: "iPad Pro",
         brandId: appleBrand[0].id,
         deviceTypeId: tabletType[0].id,
-        specifications: { screen: "12.9 inch", storage: "256GB", connectivity: "WiFi + Cellular" },
+        specifications: JSON.stringify({
+          screen: "12.9 inch",
+          storage: "256GB",
+          connectivity: "WiFi + Cellular",
+        }),
       },
       {
         name: "XPS 13",
         brandId: dellBrand[0].id,
         deviceTypeId: laptopType[0].id,
-        specifications: { screen: "13.3 inch", processor: "Intel i7", ram: "16GB" },
+        specifications: JSON.stringify({
+          screen: "13.3 inch",
+          processor: "Intel i7",
+          ram: "16GB",
+        }),
       },
       {
         name: "OptiPlex 7090",
-        brandId: dellBrand[0].id, 
+        brandId: dellBrand[0].id,
         deviceTypeId: desktopType[0].id,
-        specifications: { processor: "Intel i5", ram: "8GB", storage: "256GB SSD" },
+        specifications: JSON.stringify({
+          processor: "Intel i5",
+          ram: "8GB",
+          storage: "256GB SSD",
+        }),
       },
     ]);
-
-    console.log("✓ Models seeded");
-
     // Seed Service Types
     await db.insert(serviceTypes).values([
       {
@@ -143,10 +184,10 @@ export async function seedDatabase() {
         basePrice: "75.00",
       },
       {
-        name: "Software Installation", 
+        name: "Software Installation",
         description: "Operating system and software installation",
         estimatedDuration: 60,
-        basePrice: "50.00", 
+        basePrice: "50.00",
       },
       {
         name: "Virus Removal",
@@ -162,7 +203,7 @@ export async function seedDatabase() {
       },
       {
         name: "Screen Replacement",
-        description: "LCD/LED screen replacement and repair", 
+        description: "LCD/LED screen replacement and repair",
         estimatedDuration: 90,
         basePrice: "120.00",
       },
@@ -173,9 +214,6 @@ export async function seedDatabase() {
         basePrice: "85.00",
       },
     ]);
-
-    console.log("✓ Service types seeded");
-
     // Seed Inventory Items
     await db.insert(inventoryItems).values([
       {
@@ -191,7 +229,7 @@ export async function seedDatabase() {
       },
       {
         name: "USB-C Cable",
-        sku: "CABLE-USB-C-001", 
+        sku: "CABLE-USB-C-001",
         description: "USB-C to USB-C cable 6ft",
         category: "Cables",
         purchasePrice: "8.00",
@@ -206,7 +244,7 @@ export async function seedDatabase() {
         description: "Protective case for iPhone 14",
         category: "Cases",
         purchasePrice: "8.50",
-        salePrice: "15.99", 
+        salePrice: "15.99",
         quantity: 18,
         minStockLevel: 20,
         supplier: "Mobile Accessories Ltd",
@@ -216,7 +254,7 @@ export async function seedDatabase() {
         sku: "KB-MECH-001",
         description: "RGB mechanical gaming keyboard",
         category: "Peripherals",
-        purchasePrice: "25.00", 
+        purchasePrice: "25.00",
         salePrice: "45.00",
         quantity: 12,
         minStockLevel: 5,
@@ -230,7 +268,7 @@ export async function seedDatabase() {
         purchasePrice: "35.00",
         salePrice: "55.00",
         quantity: 1,
-        minStockLevel: 5, 
+        minStockLevel: 5,
         supplier: "Memory World",
       },
       {
@@ -248,7 +286,7 @@ export async function seedDatabase() {
         name: "HDMI Cable 6ft",
         sku: "HDMI-6FT-001",
         description: "High-speed HDMI cable 6 feet",
-        category: "Cables", 
+        category: "Cables",
         purchasePrice: "6.00",
         salePrice: "12.50",
         quantity: 15,
@@ -267,50 +305,45 @@ export async function seedDatabase() {
         supplier: "Power Solutions",
       },
     ]);
-
-    console.log("✓ Inventory items seeded");
-
     // Seed Sample Customers
-    const customer1 = await db.insert(customers).values({
-      name: "John Smith",
-      email: "john.smith@email.com",
-      phone: "(555) 123-4567",
-      address: "123 Main St, Anytown, ST 12345",
-    }).returning();
-
-    const customer2 = await db.insert(customers).values({
-      name: "Sarah Johnson", 
-      email: "sarah.j@email.com",
-      phone: "(555) 234-5678",
-      address: "456 Oak Ave, Somewhere, ST 12346",
-    }).returning();
-
-    const customer3 = await db.insert(customers).values({
-      name: "Mike Davis",
-      email: "mike.davis@email.com", 
-      phone: "(555) 345-6789",
-      address: "789 Pine St, Elsewhere, ST 12347",
-    }).returning();
-
-    console.log("✓ Sample customers seeded");
-
-    console.log("Database seeding completed successfully!");
-
+    const customer1 = await db
+      .insert(customers)
+      .values({
+        name: "John Smith",
+        email: "john.smith@email.com",
+        phone: "(555) 123-4567",
+        address: "123 Main St, Anytown, ST 12345",
+      })
+      .returning();
+    const customer2 = await db
+      .insert(customers)
+      .values({
+        name: "Sarah Johnson",
+        email: "sarah.j@email.com",
+        phone: "(555) 234-5678",
+        address: "456 Oak Ave, Somewhere, ST 12346",
+      })
+      .returning();
+    const customer3 = await db
+      .insert(customers)
+      .values({
+        name: "Mike Davis",
+        email: "mike.davis@email.com",
+        phone: "(555) 345-6789",
+        address: "789 Pine St, Elsewhere, ST 12347",
+      })
+      .returning();
   } catch (error) {
-    console.error("Error seeding database:", error);
     throw error;
   }
 }
-
 // Run seeding if this file is executed directly
 if (import.meta.url === `file://${process.argv[1]}`) {
   seedDatabase()
     .then(() => {
-      console.log("Seeding completed!");
       process.exit(0);
     })
     .catch((error) => {
-      console.error("Seeding failed:", error);
       process.exit(1);
     });
 }

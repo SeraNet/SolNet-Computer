@@ -1,23 +1,19 @@
 import { db } from "./db";
 import { users, locations, businessProfile } from "@shared/schema";
 import { eq } from "drizzle-orm";
-
 async function seedDemoUsers() {
-  console.log("Seeding demo users...");
-
   try {
     // Get first location
     const [location] = await db.select().from(locations).limit(1);
     const locationId = location?.id;
-
     // Create demo users with simple passwords
     const demoUsers = [
       {
         username: "admin",
         password: "admin123", // In production, this would be hashed
-        email: "admin@leulnet.com",
-        firstName: "System",
-        lastName: "Administrator",
+        email: "admin@solnetcomputer.com",
+        firstName: "Solomon",
+        lastName: "Tadese",
         role: "admin" as const,
         locationId,
         isActive: true,
@@ -25,9 +21,9 @@ async function seedDemoUsers() {
       {
         username: "tech",
         password: "tech123",
-        email: "tech@leulnet.com",
-        firstName: "John",
-        lastName: "Technician",
+        email: "tech@solnetcomputer.com",
+        firstName: "Hussien",
+        lastName: "Rete",
         role: "technician" as const,
         locationId,
         isActive: true,
@@ -35,68 +31,62 @@ async function seedDemoUsers() {
       {
         username: "sales",
         password: "sales123",
-        email: "sales@leulnet.com",
-        firstName: "Sarah",
-        lastName: "Sales",
+        email: "sales@solnetcomputer.com",
+        firstName: "Sara",
+        lastName: "Mohammednur",
         role: "sales" as const,
         locationId,
         isActive: true,
       },
     ];
-
     for (const user of demoUsers) {
       // Check if user already exists
-      const [existing] = await db.select().from(users).where(eq(users.username, user.username)).limit(1);
-      
+      const [existing] = await db
+        .select()
+        .from(users)
+        .where(eq(users.username, user.username))
+        .limit(1);
+
       if (!existing) {
         await db.insert(users).values(user);
-        console.log(`Created user: ${user.username} (${user.role})`);
       } else {
-        console.log(`User ${user.username} already exists`);
       }
     }
-
     // Create business profile if it doesn't exist
     const [existingProfile] = await db.select().from(businessProfile).limit(1);
     if (!existingProfile) {
       await db.insert(businessProfile).values({
-        businessName: "LeulNet Computer Services",
+        businessName: "SolNet Computer Services",
         ownerName: "Business Owner",
-        email: "info@leulnet.com",
-        phone: "(555) 123-4567",
-        address: "123 Technology Drive",
-        city: "Tech City",
-        state: "CA",
-        zipCode: "12345",
-        country: "USA",
-        website: "https://leulnet.com",
+        email: "info@solnetcomputer.com",
+        phone: "091 334 1664",
+        address: "Halaba Ediget Primary School",
+        city: "Halaba",
+        state: "Central Ethiopia",
+        zipCode: "1000",
+        country: "Ethiopia",
+        website: "https://solnetcomputer.com",
         businessType: "Computer Repair Shop",
-        description: "Professional computer repair and technology services. We specialize in laptop repair, desktop maintenance, phone repair, and data recovery services.",
+        description:
+          "Professional computer repair and technology services. We specialize in laptop repair, desktop maintenance, and data recovery services.",
         workingHours: {
-          monday: { open: "09:00", close: "18:00", closed: false },
-          tuesday: { open: "09:00", close: "18:00", closed: false },
-          wednesday: { open: "09:00", close: "18:00", closed: false },
-          thursday: { open: "09:00", close: "18:00", closed: false },
-          friday: { open: "09:00", close: "18:00", closed: false },
-          saturday: { open: "10:00", close: "16:00", closed: false },
-          sunday: { open: "12:00", close: "16:00", closed: false }
+          monday: { open: "08:00", close: "20:00", closed: false },
+          tuesday: { open: "08:00", close: "20:00", closed: false },
+          wednesday: { open: "08:00", close: "20:00", closed: false },
+          thursday: { open: "08:00", close: "20:00", closed: false },
+          friday: { open: "08:00", close: "20:00", closed: false },
+          saturday: { open: "09:00", close: "19:00", closed: false },
+          sunday: { open: "08:00", close: "20:00", closed: true },
         },
         socialLinks: {
-          facebook: "https://facebook.com/leulnet",
-          twitter: "https://twitter.com/leulnet",
-          instagram: "https://instagram.com/leulnet"
-        }
+          facebook: "https://facebook.com/solnetitsolutions",
+          twitter: "https://twitter.com/solnetitsolutions",
+          instagram: "https://instagram.com/solnetitsolutions",
+        },
       });
-      console.log("Created business profile");
     }
-
-    console.log("Demo users seeded successfully!");
-  } catch (error) {
-    console.error("Error seeding demo users:", error);
-  }
+  } catch (error) {}
 }
-
 // Run the seeding function
 seedDemoUsers().then(() => process.exit(0));
-
 export { seedDemoUsers };

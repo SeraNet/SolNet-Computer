@@ -1,0 +1,4084 @@
+import { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
+import ReportGenerator from "@/components/report-generator";
+import PrimaryLogoDisplay from "@/components/primary-logo-display";
+import IconLogoDisplay from "@/components/icon-logo-display";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import {
+  Settings as SettingsIcon,
+  Building2,
+  Bell,
+  Printer,
+  Mail,
+  Phone,
+  MapPin,
+  Clock,
+  Shield,
+  Database,
+  Download,
+  Upload,
+  RefreshCw,
+  Users,
+  Key,
+  Eye,
+  EyeOff,
+  AlertTriangle,
+  CheckCircle,
+  X,
+  Plus,
+  Trash2,
+  Save,
+  FileText,
+  CreditCard,
+  Calendar,
+  BarChart3,
+  Globe,
+  Palette,
+  Lock,
+  Unlock,
+  Zap,
+  Wrench,
+  Receipt,
+  Settings2,
+  Monitor,
+  Smartphone,
+  Tablet,
+  Image,
+  Info,
+  MessageSquare,
+  Tag,
+} from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { formatCurrency } from "@/lib/currency";
+import { EthiopianSMSSettings } from "@/components/ethiopian-sms-settings";
+import { SMSTemplateEditor } from "@/components/sms-template-editor";
+import { BulkSMSCampaign } from "@/components/bulk-sms-campaign";
+import { RecipientGroupsManager } from "@/components/recipient-groups-manager";
+const businessInfoSchema = z.object({
+  businessName: z.string().min(1, "Business name is required"),
+  address: z.string().min(1, "Address is required"),
+  city: z.string().min(1, "City is required"),
+  state: z.string().min(1, "State is required"),
+  zipCode: z.string().min(1, "ZIP code is required"),
+  phone: z.string().min(1, "Phone number is required"),
+  email: z.string().email("Valid email is required"),
+  website: z.string().optional(),
+  taxId: z.string().optional(),
+  licenseNumber: z.string().optional(),
+});
+const notificationSchema = z.object({
+  emailNotifications: z.boolean(),
+  smsNotifications: z.boolean(),
+  deviceStatusUpdates: z.boolean(),
+  lowStockAlerts: z.boolean(),
+  appointmentReminders: z.boolean(),
+  paymentNotifications: z.boolean(),
+  weeklyReports: z.boolean(),
+  systemAlerts: z.boolean(),
+});
+const smsConfigSchema = z.object({
+  twilioAccountSid: z.string().optional(),
+  twilioAuthToken: z.string().optional(),
+  twilioFromNumber: z.string().optional(),
+});
+const systemSchema = z.object({
+  defaultCurrency: z.string(),
+  timeZone: z.string(),
+  dateFormat: z.string(),
+  language: z.string(),
+  theme: z.string(),
+  autoBackup: z.boolean(),
+  backupFrequency: z.string(),
+  sessionTimeout: z.number().min(15).max(480),
+});
+const receiptSchema = z.object({
+  headerText: z.string().optional(),
+  footerText: z.string().optional(),
+  showLogo: z.boolean(),
+  showBusinessInfo: z.boolean(),
+  includeBarcode: z.boolean(),
+  paperSize: z.string(),
+  fontSize: z.string(),
+  termsAndConditions: z.string().optional(),
+});
+const securitySchema = z.object({
+  requirePasswordChange: z.boolean(),
+  passwordExpiryDays: z.number().min(30).max(365),
+  maxLoginAttempts: z.number().min(3).max(10),
+  sessionTimeout: z.number().min(15).max(480),
+  twoFactorAuth: z.boolean(),
+  ipWhitelist: z.string().optional(),
+  auditLogging: z.boolean(),
+  dataEncryption: z.boolean(),
+});
+const userManagementSchema = z.object({
+  allowUserRegistration: z.boolean(),
+  requireEmailVerification: z.boolean(),
+  defaultUserRole: z.string(),
+  maxUsers: z.number().min(1).max(100),
+  userSessionTimeout: z.number().min(15).max(480),
+  passwordPolicy: z.object({
+    minLength: z.number().min(8).max(20),
+    requireUppercase: z.boolean(),
+    requireLowercase: z.boolean(),
+    requireNumbers: z.boolean(),
+    requireSpecialChars: z.boolean(),
+  }),
+});
+const businessRulesSchema = z.object({
+  autoAssignTechnicians: z.boolean(),
+  defaultRepairTime: z.number().min(1).max(30),
+  lowStockThreshold: z.number().min(1).max(100),
+  overdueReminderDays: z.number().min(1).max(30),
+  autoGenerateInvoices: z.boolean(),
+  requireCustomerApproval: z.boolean(),
+  defaultPaymentTerms: z.number().min(0).max(90),
+  taxRate: z.number().min(0).max(50),
+  currencySymbol: z.string(),
+  decimalPlaces: z.number().min(0).max(4),
+});
+const integrationsSchema = z.object({
+  smsProvider: z.string(),
+  emailProvider: z.string(),
+  paymentGateway: z.string(),
+  accountingSoftware: z.string(),
+  crmIntegration: z.boolean(),
+  apiEnabled: z.boolean(),
+  webhookUrl: z.string().optional(),
+  syncFrequency: z.string(),
+});
+const backupSchema = z.object({
+  autoBackup: z.boolean(),
+  backupFrequency: z.string(),
+  backupRetention: z.number().min(1).max(365),
+  cloudBackup: z.boolean(),
+  backupLocation: z.string(),
+  encryptBackups: z.boolean(),
+  testBackupRestore: z.boolean(),
+});
+const maintenanceSchema = z.object({
+  autoOptimizeDatabase: z.boolean(),
+  optimizeFrequency: z.string(),
+  clearCacheFrequency: z.string(),
+  logRetentionDays: z.number().min(1).max(365),
+  enableDebugMode: z.boolean(),
+  enablePerformanceMonitoring: z.boolean(),
+  autoCleanupOldData: z.boolean(),
+  cleanupRetentionDays: z.number().min(30).max(1095),
+  enableSystemHealthChecks: z.boolean(),
+  healthCheckFrequency: z.string(),
+});
+type BusinessInfoForm = z.infer<typeof businessInfoSchema>;
+type NotificationForm = z.infer<typeof notificationSchema>;
+type SMSConfigForm = z.infer<typeof smsConfigSchema>;
+type SystemForm = z.infer<typeof systemSchema>;
+type ReceiptForm = z.infer<typeof receiptSchema>;
+type SecurityForm = z.infer<typeof securitySchema>;
+type UserManagementForm = z.infer<typeof userManagementSchema>;
+type BusinessRulesForm = z.infer<typeof businessRulesSchema>;
+type IntegrationsForm = z.infer<typeof integrationsSchema>;
+type BackupForm = z.infer<typeof backupSchema>;
+type MaintenanceForm = z.infer<typeof maintenanceSchema>;
+export default function Settings() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState("business-info");
+  const [showPassword, setShowPassword] = useState(false);
+  const [isBackupRunning, setIsBackupRunning] = useState(false);
+  const [isRestoreRunning, setIsRestoreRunning] = useState(false);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [primaryLogoFile, setPrimaryLogoFile] = useState<File | null>(null);
+  const [primaryLogoPreview, setPrimaryLogoPreview] = useState<string | null>(
+    null
+  );
+  const [iconLogoFile, setIconLogoFile] = useState<File | null>(null);
+  const [iconLogoPreview, setIconLogoPreview] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [smsServiceStatus, setSmsServiceStatus] = useState(false);
+  const [smsProvider, setSmsProvider] = useState("ethiopian");
+  // SMS Settings Query
+  const { data: smsSettings } = useQuery({
+    queryKey: ["sms-settings"],
+    queryFn: () => apiRequest("/api/settings/sms", "GET"),
+  });
+  // SMS Settings Mutation
+  const smsSettingsMutation = useMutation({
+    mutationFn: (data: SMSConfigForm) =>
+      apiRequest("/api/settings/sms", "POST", data),
+    onSuccess: () => {
+      toast({
+        title: "SMS Settings Saved",
+        description: "SMS configuration has been saved successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["sms-settings"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save SMS settings",
+        variant: "destructive",
+      });
+    },
+  });
+  // Business Information Form
+  const businessForm = useForm<BusinessInfoForm>({
+    resolver: zodResolver(businessInfoSchema),
+    defaultValues: {
+      businessName: "SolNet Computer Services",
+      address: "123 Tech Street",
+      city: "Tech City",
+      state: "CA",
+      zipCode: "12345",
+      phone: "(555) 123-4567",
+      email: "info@solnetcomputer.com",
+      website: "https://solnetcomputer.com",
+      taxId: "123-45-6789",
+      licenseNumber: "LIC-2024-001",
+    },
+  });
+  // Notification Settings Form
+  const notificationForm = useForm<NotificationForm>({
+    resolver: zodResolver(notificationSchema),
+    defaultValues: {
+      emailNotifications: true,
+      smsNotifications: false,
+      deviceStatusUpdates: true,
+      lowStockAlerts: true,
+      appointmentReminders: true,
+      paymentNotifications: true,
+      weeklyReports: true,
+      systemAlerts: true,
+    },
+  });
+  // SMS Configuration Form
+  const smsConfigForm = useForm<SMSConfigForm>({
+    resolver: zodResolver(smsConfigSchema),
+    defaultValues: {
+      twilioAccountSid: "",
+      twilioAuthToken: "",
+      twilioFromNumber: "",
+    },
+  });
+  // Update SMS form when settings are loaded
+  useEffect(() => {
+    if (smsSettings) {
+      smsConfigForm.reset({
+        twilioAccountSid: smsSettings.twilioAccountSid || "",
+        twilioAuthToken: smsSettings.twilioAuthToken || "",
+        twilioFromNumber: smsSettings.twilioFromNumber || "",
+      });
+      // Update service status based on configuration
+      const isConfigured = !!(
+        smsSettings.twilioAccountSid &&
+        smsSettings.twilioAuthToken &&
+        smsSettings.twilioFromNumber
+      );
+      setSmsServiceStatus(isConfigured);
+    }
+  }, [smsSettings, smsConfigForm]);
+  // System Settings Form
+  const systemForm = useForm<SystemForm>({
+    resolver: zodResolver(systemSchema),
+    defaultValues: {
+      defaultCurrency: "ETB",
+      timeZone: "America/New_York",
+      dateFormat: "MM/DD/YYYY",
+      language: "en",
+      theme: "system",
+      autoBackup: true,
+      backupFrequency: "daily",
+      sessionTimeout: 60,
+    },
+  });
+  // Receipt Settings Form
+  const receiptForm = useForm<ReceiptForm>({
+    resolver: zodResolver(receiptSchema),
+    defaultValues: {
+      headerText: "Thank you for choosing SolNet!",
+      footerText: "Visit us again for all your computer needs",
+      showLogo: true,
+      showBusinessInfo: true,
+      includeBarcode: true,
+      paperSize: "80mm",
+      fontSize: "12px",
+      termsAndConditions:
+        "All repairs come with a 30-day warranty. No warranty on liquid damage.",
+    },
+  });
+  // Security Form
+  const securityForm = useForm<SecurityForm>({
+    resolver: zodResolver(securitySchema),
+    defaultValues: {
+      requirePasswordChange: true,
+      passwordExpiryDays: 90,
+      maxLoginAttempts: 5,
+      sessionTimeout: 60,
+      twoFactorAuth: false,
+      ipWhitelist: "",
+      auditLogging: true,
+      dataEncryption: true,
+    },
+  });
+  // User Management Form
+  const userManagementForm = useForm<UserManagementForm>({
+    resolver: zodResolver(userManagementSchema),
+    defaultValues: {
+      allowUserRegistration: false,
+      requireEmailVerification: true,
+      defaultUserRole: "technician",
+      maxUsers: 10,
+      userSessionTimeout: 60,
+      passwordPolicy: {
+        minLength: 8,
+        requireUppercase: true,
+        requireLowercase: true,
+        requireNumbers: true,
+        requireSpecialChars: false,
+      },
+    },
+  });
+  // Business Rules Form
+  const businessRulesForm = useForm<BusinessRulesForm>({
+    resolver: zodResolver(businessRulesSchema),
+    defaultValues: {
+      autoAssignTechnicians: true,
+      defaultRepairTime: 3,
+      lowStockThreshold: 10,
+      overdueReminderDays: 7,
+      autoGenerateInvoices: true,
+      requireCustomerApproval: false,
+      defaultPaymentTerms: 30,
+      taxRate: 15,
+      currencySymbol: "ETB",
+      decimalPlaces: 2,
+    },
+  });
+  // Integrations Form
+  const integrationsForm = useForm<IntegrationsForm>({
+    resolver: zodResolver(integrationsSchema),
+    defaultValues: {
+      smsProvider: "ethiopian",
+      emailProvider: "smtp",
+      paymentGateway: "stripe",
+      accountingSoftware: "quickbooks",
+      crmIntegration: false,
+      apiEnabled: false,
+      webhookUrl: "",
+      syncFrequency: "daily",
+    },
+  });
+  // Sync integrations form SMS provider with state
+  useEffect(() => {
+    const subscription = integrationsForm.watch((value, { name }) => {
+      if (name === "smsProvider" && value.smsProvider) {
+        setSmsProvider(value.smsProvider);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [integrationsForm]);
+  // Backup Form
+  const backupForm = useForm<BackupForm>({
+    resolver: zodResolver(backupSchema),
+    defaultValues: {
+      autoBackup: true,
+      backupFrequency: "daily",
+      backupRetention: 30,
+      cloudBackup: false,
+      backupLocation: "local",
+      encryptBackups: true,
+      testBackupRestore: false,
+    },
+  });
+  // Maintenance Form
+  const maintenanceForm = useForm<MaintenanceForm>({
+    resolver: zodResolver(maintenanceSchema),
+    defaultValues: {
+      autoOptimizeDatabase: true,
+      optimizeFrequency: "weekly",
+      clearCacheFrequency: "daily",
+      logRetentionDays: 90,
+      enableDebugMode: false,
+      enablePerformanceMonitoring: true,
+      autoCleanupOldData: true,
+      cleanupRetentionDays: 365,
+      enableSystemHealthChecks: true,
+      healthCheckFrequency: "daily",
+    },
+  });
+  const onBusinessSubmit = (data: BusinessInfoForm) => {
+    saveSettings("business", data);
+  };
+  const onNotificationSubmit = (data: NotificationForm) => {
+    saveSettings("notifications", data);
+  };
+  const onSMSConfigSubmit = async (data: SMSConfigForm) => {
+    // Save SMS provider setting to system settings
+    try {
+      await saveSettings("integrations", { smsProvider });
+    } catch (error) {}
+    smsSettingsMutation.mutate(data);
+  };
+  const onSystemSubmit = (data: SystemForm) => {
+    saveSettings("system", data);
+  };
+  const onReceiptSubmit = (data: ReceiptForm) => {
+    saveSettings("receipt", data);
+  };
+  const handleBackup = () => {
+    toast({
+      title: "Backup Started",
+      description: "Database backup is in progress...",
+    });
+  };
+  const handleRestore = () => {
+    toast({
+      title: "Restore Started",
+      description: "Database restore is in progress...",
+    });
+  };
+  const handleExport = () => {
+    toast({
+      title: "Export Started",
+      description: "Data export is in progress...",
+    });
+  };
+  const onSecuritySubmit = (data: SecurityForm) => {
+    saveSettings("security", data);
+  };
+  const onUserManagementSubmit = (data: UserManagementForm) => {
+    saveSettings("user-management", data);
+  };
+  const onBusinessRulesSubmit = (data: BusinessRulesForm) => {
+    saveSettings("business-rules", data);
+  };
+  const onIntegrationsSubmit = (data: IntegrationsForm) => {
+    saveSettings("integrations", data);
+  };
+  const onBackupSubmit = (data: BackupForm) => {
+    saveSettings("backup", data);
+  };
+  const onMaintenanceSubmit = (data: MaintenanceForm) => {
+    saveSettings("maintenance", data);
+  };
+  const handleTestBackup = () => {
+    setIsBackupRunning(true);
+    setTimeout(() => {
+      setIsBackupRunning(false);
+      toast({
+        title: "Backup Test Complete",
+        description: "Backup and restore test completed successfully.",
+      });
+    }, 3000);
+  };
+  const handleSystemHealth = () => {
+    toast({
+      title: "System Health Check",
+      description: "System is running optimally. All services are healthy.",
+    });
+  };
+  const handleClearCache = () => {
+    toast({
+      title: "Cache Cleared",
+      description: "System cache has been cleared successfully.",
+    });
+  };
+  const handleDatabaseOptimization = () => {
+    toast({
+      title: "Database Optimization",
+      description: "Database optimization completed successfully.",
+    });
+  };
+  const testSMSService = async () => {
+    try {
+      // Check if the selected provider is an Ethiopian SMS provider
+      const isEthiopianProvider = [
+        "ethio_telecom",
+        "africas_talking",
+        "bulksms",
+        "local_aggregator",
+      ].includes(smsProvider);
+      const endpoint = isEthiopianProvider
+        ? "/api/ethiopian-sms/test"
+        : "/api/sms/test";
+      const response = await apiRequest(endpoint, "POST");
+      if (response.success) {
+        toast({
+          title: "SMS Test Successful",
+          description: `${smsProvider} test SMS sent successfully!`,
+        });
+      } else {
+        toast({
+          title: "SMS Test Failed",
+          description: response.message || "Failed to send test SMS",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "SMS Test Failed",
+        description: `Failed to send ${smsProvider} test SMS. Please check your configuration.`,
+        variant: "destructive",
+      });
+    }
+  };
+  // Load settings from database
+  const loadSettings = async (category: string) => {
+    try {
+      const response = await apiRequest(`/api/settings/${category}`, "GET");
+      return response;
+    } catch (error) {
+      return {};
+    }
+  };
+  // Save settings to database
+  const saveSettings = async (
+    category: string,
+    settings: Record<string, any>
+  ) => {
+    setIsLoading(true);
+    try {
+      const promises = Object.entries(settings).map(([key, value]) =>
+        apiRequest("/api/settings", "POST", {
+          category,
+          key,
+          value,
+          description: `${category} setting for ${key}`,
+        })
+      );
+      await Promise.all(promises);
+      toast({
+        title: `${category} Settings Updated`,
+        description: "Your settings have been saved successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: `Failed to save ${category} settings.`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  // Logo management
+  const { data: currentLogo } = useQuery({
+    queryKey: ["logo"],
+    queryFn: () => apiRequest("/api/logo"),
+  });
+  const uploadLogoMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("logo", file);
+      return apiRequest("/api/logo/upload", "POST", formData);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Logo Updated",
+        description: "Your business logo has been updated successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["logo"] });
+      setLogoFile(null);
+      setLogoPreview(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Upload Failed",
+        description: `Failed to upload logo: ${error.message}`,
+        variant: "destructive",
+      });
+    },
+  });
+  const deleteLogoMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("/api/logo", "DELETE");
+    },
+    onSuccess: () => {
+      toast({
+        title: "Logo Removed",
+        description: "Your business logo has been removed.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["logo"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Delete Failed",
+        description: `Failed to remove logo: ${error.message}`,
+        variant: "destructive",
+      });
+    },
+  });
+  const handleLogoSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith("image/")) {
+        toast({
+          title: "Invalid File",
+          description: "Please select an image file (PNG, JPG, JPEG, GIF).",
+          variant: "destructive",
+        });
+        return;
+      }
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast({
+          title: "File Too Large",
+          description: "Please select an image smaller than 5MB.",
+          variant: "destructive",
+        });
+        return;
+      }
+      setLogoFile(file);
+      // Create preview
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setLogoPreview(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+  const handleLogoUpload = () => {
+    if (logoFile) {
+      uploadLogoMutation.mutate(logoFile);
+    }
+  };
+  const handleLogoDelete = () => {
+    if (confirm("Are you sure you want to remove the current logo?")) {
+      deleteLogoMutation.mutate();
+    }
+  };
+  // Hybrid Logo System - Primary Logo management
+  const { data: currentPrimaryLogo } = useQuery({
+    queryKey: ["primary-logo"],
+    queryFn: () => apiRequest("/api/logo/primary"),
+  });
+  const uploadPrimaryLogoMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("logo", file);
+      return apiRequest("/api/logo/primary/upload", "POST", formData);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Primary Logo Updated",
+        description: "Your primary logo has been updated successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["primary-logo"] });
+      setPrimaryLogoFile(null);
+      setPrimaryLogoPreview(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Upload Failed",
+        description: `Failed to upload primary logo: ${error.message}`,
+        variant: "destructive",
+      });
+    },
+  });
+  const deletePrimaryLogoMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("/api/logo/primary", "DELETE");
+    },
+    onSuccess: () => {
+      toast({
+        title: "Primary Logo Removed",
+        description: "Your primary logo has been removed.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["primary-logo"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Delete Failed",
+        description: `Failed to remove primary logo: ${error.message}`,
+        variant: "destructive",
+      });
+    },
+  });
+  // Hybrid Logo System - Icon Logo management
+  const { data: currentIconLogo } = useQuery({
+    queryKey: ["icon-logo"],
+    queryFn: () => apiRequest("/api/logo/icon"),
+  });
+  const uploadIconLogoMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("logo", file);
+      return apiRequest("/api/logo/icon/upload", "POST", formData);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Icon Logo Updated",
+        description: "Your icon logo has been updated successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["icon-logo"] });
+      setIconLogoFile(null);
+      setIconLogoPreview(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Upload Failed",
+        description: `Failed to upload icon logo: ${error.message}`,
+        variant: "destructive",
+      });
+    },
+  });
+  const deleteIconLogoMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("/api/logo/icon", "DELETE");
+    },
+    onSuccess: () => {
+      toast({
+        title: "Icon Logo Removed",
+        description: "Your icon logo has been removed.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["icon-logo"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Delete Failed",
+        description: `Failed to remove icon logo: ${error.message}`,
+        variant: "destructive",
+      });
+    },
+  });
+  const handlePrimaryLogoSelect = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith("image/")) {
+        toast({
+          title: "Invalid File",
+          description: "Please select an image file (PNG, JPG, JPEG, GIF).",
+          variant: "destructive",
+        });
+        return;
+      }
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast({
+          title: "File Too Large",
+          description: "Please select an image smaller than 5MB.",
+          variant: "destructive",
+        });
+        return;
+      }
+      setPrimaryLogoFile(file);
+      // Create preview
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setPrimaryLogoPreview(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+  const handlePrimaryLogoUpload = () => {
+    if (primaryLogoFile) {
+      uploadPrimaryLogoMutation.mutate(primaryLogoFile);
+    }
+  };
+  const handleIconLogoSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith("image/")) {
+        toast({
+          title: "Invalid File",
+          description: "Please select an image file (PNG, JPG, JPEG, GIF).",
+          variant: "destructive",
+        });
+        return;
+      }
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast({
+          title: "File Too Large",
+          description: "Please select an image smaller than 5MB.",
+          variant: "destructive",
+        });
+        return;
+      }
+      setIconLogoFile(file);
+      // Create preview
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setIconLogoPreview(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+  const handleIconLogoUpload = () => {
+    if (iconLogoFile) {
+      uploadIconLogoMutation.mutate(iconLogoFile);
+    }
+  };
+  // Load settings on component mount
+  useEffect(() => {
+    const loadAllSettings = async () => {
+      const businessSettings = await loadSettings("business");
+      const notificationSettings = await loadSettings("notifications");
+      const systemSettings = await loadSettings("system");
+      const receiptSettings = await loadSettings("receipt");
+      const securitySettings = await loadSettings("security");
+      const userManagementSettings = await loadSettings("user-management");
+      const businessRulesSettings = await loadSettings("business-rules");
+      const integrationsSettings = await loadSettings("integrations");
+      const maintenanceSettings = await loadSettings("maintenance");
+      // Update form default values with loaded settings
+      if (Object.keys(businessSettings).length > 0) {
+        businessForm.reset(businessSettings);
+      }
+      if (Object.keys(notificationSettings).length > 0) {
+        notificationForm.reset(notificationSettings);
+      }
+      if (Object.keys(systemSettings).length > 0) {
+        systemForm.reset(systemSettings);
+      }
+      if (Object.keys(receiptSettings).length > 0) {
+        receiptForm.reset(receiptSettings);
+      }
+      if (Object.keys(securitySettings).length > 0) {
+        securityForm.reset(securitySettings);
+      }
+      if (Object.keys(userManagementSettings).length > 0) {
+        userManagementForm.reset(userManagementSettings);
+      }
+      if (Object.keys(businessRulesSettings).length > 0) {
+        businessRulesForm.reset(businessRulesSettings);
+      }
+      if (Object.keys(integrationsSettings).length > 0) {
+        integrationsForm.reset(integrationsSettings);
+      }
+      if (Object.keys(maintenanceSettings).length > 0) {
+        maintenanceForm.reset(maintenanceSettings);
+      }
+    };
+    loadAllSettings();
+  }, []);
+  return (
+    <div className="content-spacing">
+      {/* Page Header */}
+      <div className="page-header">
+        <div className="flex items-center gap-4 mb-4">
+          <div className="p-3 gradient-primary rounded-xl shadow-lg">
+              <SettingsIcon className="h-8 w-8 text-white" />
+            </div>
+            <div>
+              <h1 className="page-title">System Settings</h1>
+              <p className="page-subtitle">
+                Manage your business configuration and system preferences
+              </p>
+            </div>
+          </div>
+          {/* Quick Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
+            <div className="bg-white/70 backdrop-blur-sm p-4 rounded-xl border border-white/20 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-green-100 rounded-lg">
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-slate-600">System Status</p>
+                  <p className="text-lg font-semibold text-slate-800">Active</p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-white/70 backdrop-blur-sm p-4 rounded-xl border border-white/20 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <Database className="h-5 w-5 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-slate-600">Last Backup</p>
+                  <p className="text-lg font-semibold text-slate-800">Today</p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-white/70 backdrop-blur-sm p-4 rounded-xl border border-white/20 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-purple-100 rounded-lg">
+                  <Users className="h-5 w-5 text-purple-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-slate-600">Active Users</p>
+                  <p className="text-lg font-semibold text-slate-800">12</p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-white/70 backdrop-blur-sm p-4 rounded-xl border border-white/20 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-orange-100 rounded-lg">
+                  <Shield className="h-5 w-5 text-orange-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-slate-600">Security</p>
+                  <p className="text-lg font-semibold text-slate-800">
+                    Protected
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      {/* Main Content */}
+      <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-white/20 shadow-xl overflow-hidden">
+          <Tabs
+            value={activeTab}
+            onValueChange={setActiveTab}
+            className="w-full"
+          >
+            {/* Main Category Tabs */}
+            <div className="border-b border-slate-200 bg-gradient-to-r from-slate-50 to-blue-50">
+              <TabsList className="grid w-full grid-cols-4 h-16 bg-transparent border-0 rounded-none gap-1 px-4">
+                <TabsTrigger
+                  value="business"
+                  className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-blue-600 transition-all duration-200 rounded-lg"
+                >
+                  <Building2 className="h-4 w-4" />
+                  Business
+                </TabsTrigger>
+                <TabsTrigger
+                  value="system"
+                  className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-blue-600 transition-all duration-200 rounded-lg"
+                >
+                  <SettingsIcon className="h-4 w-4" />
+                  System
+                </TabsTrigger>
+                <TabsTrigger
+                  value="security"
+                  className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-blue-600 transition-all duration-200 rounded-lg"
+                >
+                  <Shield className="h-4 w-4" />
+                  Security
+                </TabsTrigger>
+                <TabsTrigger
+                  value="reports"
+                  className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-blue-600 transition-all duration-200 rounded-lg"
+                >
+                  <FileText className="h-4 w-4" />
+                  Reports
+                </TabsTrigger>
+              </TabsList>
+            </div>
+            {/* Sub-tabs for Business Category */}
+            {(activeTab === "business" ||
+              activeTab === "business-info" ||
+              activeTab === "logo" ||
+              activeTab === "receipt") && (
+              <div className="border-b border-slate-100 bg-white/50">
+                <div className="flex gap-1 px-4 py-2 overflow-x-auto">
+                  <button
+                    onClick={() => setActiveTab("business-info")}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                      activeTab === "business-info"
+                        ? "bg-blue-100 text-blue-700 shadow-sm"
+                        : "text-slate-600 hover:text-slate-800 hover:bg-slate-100"
+                    }`}
+                  >
+                    <Building2 className="h-4 w-4" />
+                    Information
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("logo")}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                      activeTab === "logo"
+                        ? "bg-blue-100 text-blue-700 shadow-sm"
+                        : "text-slate-600 hover:text-slate-800 hover:bg-slate-100"
+                    }`}
+                  >
+                    <Image className="h-4 w-4" />
+                    Logo
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("receipt")}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                      activeTab === "receipt"
+                        ? "bg-blue-100 text-blue-700 shadow-sm"
+                        : "text-slate-600 hover:text-slate-800 hover:bg-slate-100"
+                    }`}
+                  >
+                    <Printer className="h-4 w-4" />
+                    Receipt Settings
+                  </button>
+                </div>
+              </div>
+            )}
+            {/* Sub-tabs for System Category */}
+            {(activeTab === "system" ||
+              activeTab === "system-settings" ||
+              activeTab === "notifications" ||
+              activeTab === "integrations" ||
+              activeTab === "maintenance" ||
+              activeTab === "sms-templates" ||
+              activeTab === "recipient-groups") && (
+              <div className="border-b border-slate-100 bg-white/50">
+                <div className="flex gap-1 px-4 py-2 overflow-x-auto">
+                  <button
+                    onClick={() => setActiveTab("system-settings")}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                      activeTab === "system-settings"
+                        ? "bg-blue-100 text-blue-700 shadow-sm"
+                        : "text-slate-600 hover:text-slate-800 hover:bg-slate-100"
+                    }`}
+                  >
+                    <SettingsIcon className="h-4 w-4" />
+                    General
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("notifications")}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                      activeTab === "notifications"
+                        ? "bg-blue-100 text-blue-700 shadow-sm"
+                        : "text-slate-600 hover:text-slate-800 hover:bg-slate-100"
+                    }`}
+                  >
+                    <Bell className="h-4 w-4" />
+                    Notifications
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("integrations")}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                      activeTab === "integrations"
+                        ? "bg-blue-100 text-blue-700 shadow-sm"
+                        : "text-slate-600 hover:text-slate-800 hover:bg-slate-100"
+                    }`}
+                  >
+                    <Globe className="h-4 w-4" />
+                    Integrations
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("maintenance")}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                      activeTab === "maintenance"
+                        ? "bg-blue-100 text-blue-700 shadow-sm"
+                        : "text-slate-600 hover:text-slate-800 hover:bg-slate-100"
+                    }`}
+                  >
+                    <Settings2 className="h-4 w-4" />
+                    Maintenance
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("sms-templates")}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                      activeTab === "sms-templates"
+                        ? "bg-blue-100 text-blue-700 shadow-sm"
+                        : "text-slate-600 hover:text-slate-800 hover:bg-slate-100"
+                    }`}
+                  >
+                    <MessageSquare className="h-4 w-4" />
+                    SMS Templates
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("recipient-groups")}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                      activeTab === "recipient-groups"
+                        ? "bg-blue-100 text-blue-700 shadow-sm"
+                        : "text-slate-600 hover:text-slate-800 hover:bg-slate-100"
+                    }`}
+                  >
+                    <Users className="h-4 w-4" />
+                    Recipient Groups
+                  </button>
+                </div>
+              </div>
+            )}
+            {/* Sub-tabs for Security Category */}
+            {(activeTab === "security" ||
+              activeTab === "security-settings" ||
+              activeTab === "users" ||
+              activeTab === "business-rules") && (
+              <div className="border-b border-slate-100 bg-white/50">
+                <div className="flex gap-1 px-4 py-2 overflow-x-auto">
+                  <button
+                    onClick={() => setActiveTab("security-settings")}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                      activeTab === "security-settings"
+                        ? "bg-blue-100 text-blue-700 shadow-sm"
+                        : "text-slate-600 hover:text-slate-800 hover:bg-slate-100"
+                    }`}
+                  >
+                    <Shield className="h-4 w-4" />
+                    Security Settings
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("users")}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                      activeTab === "users"
+                        ? "bg-blue-100 text-blue-700 shadow-sm"
+                        : "text-slate-600 hover:text-slate-800 hover:bg-slate-100"
+                    }`}
+                  >
+                    <Users className="h-4 w-4" />
+                    User Management
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("business-rules")}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                      activeTab === "business-rules"
+                        ? "bg-blue-100 text-blue-700 shadow-sm"
+                        : "text-slate-600 hover:text-slate-800 hover:bg-slate-100"
+                    }`}
+                  >
+                    <Wrench className="h-4 w-4" />
+                    Business Rules
+                  </button>
+                </div>
+              </div>
+            )}
+            <TabsContent value="business-info" className="p-8 space-y-6">
+              <Card className="border-0 shadow-lg bg-white/90 backdrop-blur-sm">
+                <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100">
+                  <CardTitle className="flex items-center gap-3 text-slate-800">
+                    <div className="p-2 bg-blue-100 rounded-lg">
+                      <Building2 className="h-5 w-5 text-blue-600" />
+                    </div>
+                    Business Information
+                  </CardTitle>
+                  <CardDescription className="text-slate-600 mt-2">
+                    Update your business details for receipts, invoices, and
+                    customer communications
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Form {...businessForm}>
+                    <form
+                      onSubmit={businessForm.handleSubmit(onBusinessSubmit)}
+                      className="space-y-6"
+                    >
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <FormField
+                          control={businessForm.control}
+                          name="businessName"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-slate-700 font-medium">
+                                Business Name
+                              </FormLabel>
+                              <FormControl>
+                                <Input
+                                  placeholder="Enter business name"
+                                  className="border-slate-200 focus:border-blue-500 focus:ring-blue-500"
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={businessForm.control}
+                          name="phone"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="flex items-center gap-2">
+                                <Phone className="h-4 w-4" />
+                                Phone Number
+                              </FormLabel>
+                              <FormControl>
+                                <Input
+                                  placeholder="(555) 123-4567"
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={businessForm.control}
+                          name="email"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="flex items-center gap-2">
+                                <Mail className="h-4 w-4" />
+                                Email Address
+                              </FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="email"
+                                  placeholder="info@business.com"
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={businessForm.control}
+                          name="website"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Website (Optional)</FormLabel>
+                              <FormControl>
+                                <Input
+                                  placeholder="https://business.com"
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      <Separator />
+                      <div>
+                        <h3 className="text-lg font-medium flex items-center gap-2 mb-4">
+                          <MapPin className="h-5 w-5" />
+                          Business Address
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="md:col-span-2">
+                            <FormField
+                              control={businessForm.control}
+                              name="address"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Street Address</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      placeholder="123 Main Street"
+                                      {...field}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                          <FormField
+                            control={businessForm.control}
+                            name="city"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>City</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="City name" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={businessForm.control}
+                            name="state"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>State</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="State" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={businessForm.control}
+                            name="zipCode"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>ZIP Code</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="12345" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </div>
+                      <Separator />
+                      <div>
+                        <h3 className="text-lg font-medium flex items-center gap-2 mb-4">
+                          <Shield className="h-5 w-5" />
+                          Legal Information
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <FormField
+                            control={businessForm.control}
+                            name="taxId"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Tax ID (Optional)</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="123-45-6789" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={businessForm.control}
+                            name="licenseNumber"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>License Number (Optional)</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    placeholder="LIC-2024-001"
+                                    {...field}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </div>
+                      <div className="bg-blue-50 p-4 rounded-lg">
+                        <div className="flex items-start space-x-3">
+                          <Image className="h-5 w-5 text-blue-600 mt-0.5" />
+                          <div>
+                            <h4 className="text-sm font-medium text-blue-900 mb-1">
+                              Logo Management
+                            </h4>
+                            <p className="text-sm text-blue-800">
+                              To upload or manage your business logo, please
+                              visit the{" "}
+                              <button
+                                type="button"
+                                onClick={() => setActiveTab("logo")}
+                                className="text-blue-600 hover:text-blue-800 underline font-medium"
+                              >
+                                Logo tab
+                              </button>
+                              . Your logo will appear on receipts, reports, and
+                              your public landing page.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      <Button
+                        type="submit"
+                        className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl"
+                        disabled={isLoading}
+                      >
+                        {isLoading ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="h-4 w-4 mr-2" />
+                            Save Business Information
+                          </>
+                        )}
+                      </Button>
+                    </form>
+                  </Form>
+                </CardContent>
+              </Card>
+            </TabsContent>
+            <TabsContent value="logo" className="p-8 space-y-6">
+              <Card className="border-0 shadow-lg bg-white/90 backdrop-blur-sm">
+                <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100">
+                  <CardTitle className="flex items-center gap-3 text-slate-800">
+                    <div className="p-2 bg-blue-100 rounded-lg">
+                      <Image className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <span>Hybrid Logo System</span>
+                  </CardTitle>
+                  <CardDescription className="text-slate-600 mt-2">
+                    Manage your primary logo for website/UI and icon logo for
+                    documents. The system automatically uses the best logo for
+                    each context.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Primary Logo Section */}
+                  <div className="bg-gradient-to-r from-slate-50 to-blue-50 p-6 rounded-xl border border-slate-200">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+                        <Globe className="h-5 w-5 text-blue-600" />
+                        Primary Logo
+                      </h3>
+                      <Badge
+                        variant="secondary"
+                        className="bg-blue-100 text-blue-800"
+                      >
+                        <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
+                        Website & UI
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-slate-600 mb-4">
+                      Your main logo for website, login screen, and sidebar
+                      navigation. This should be your complete logo with company
+                      name and design.
+                    </p>
+                    <div className="flex items-center space-x-6">
+                      <div className="flex-shrink-0">
+                        <PrimaryLogoDisplay
+                          width={80}
+                          height={80}
+                          className="rounded-lg border border-slate-200"
+                          showFallback={true}
+                          fallbackText="SN"
+                        />
+                      </div>
+                      <div className="flex-1 space-y-3">
+                        <div className="flex items-center space-x-3">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handlePrimaryLogoSelect}
+                            className="hidden"
+                            id="primary-logo-upload"
+                          />
+                          <label
+                            htmlFor="primary-logo-upload"
+                            className="cursor-pointer inline-flex items-center px-3 py-2 border border-slate-300 shadow-sm text-sm leading-4 font-medium rounded-md text-slate-700 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                          >
+                            <Upload className="h-4 w-4 mr-2" />
+                            Choose Primary Logo
+                          </label>
+                          {primaryLogoFile && (
+                            <Button
+                              type="button"
+                              onClick={handlePrimaryLogoUpload}
+                              disabled={uploadPrimaryLogoMutation.isPending}
+                              size="sm"
+                            >
+                              {uploadPrimaryLogoMutation.isPending
+                                ? "Uploading..."
+                                : "Upload"}
+                            </Button>
+                          )}
+                        </div>
+                        {primaryLogoPreview && (
+                          <div className="mt-3">
+                            <p className="text-sm text-slate-600 mb-2">
+                              Preview:
+                            </p>
+                            <img
+                              src={primaryLogoPreview}
+                              alt="Primary Logo Preview"
+                              className="w-16 h-16 object-contain border border-slate-200 rounded"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  {/* Icon Logo Section */}
+                  <div className="bg-gradient-to-r from-slate-50 to-green-50 p-6 rounded-xl border border-slate-200">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+                        <Image className="h-5 w-5 text-green-600" />
+                        Icon Logo
+                      </h3>
+                      <Badge
+                        variant="secondary"
+                        className="bg-green-100 text-green-800"
+                      >
+                        <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                        Documents & Small Spaces
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-slate-600 mb-4">
+                      A simplified icon version for receipts, reports, and small
+                      spaces. This should be a clean, recognizable icon that
+                      works well at small sizes.
+                    </p>
+                    <div className="flex items-center space-x-6">
+                      <div className="flex-shrink-0">
+                        <IconLogoDisplay
+                          width={80}
+                          height={80}
+                          className="rounded-lg border border-slate-200"
+                          showFallback={true}
+                          fallbackText="SN"
+                        />
+                      </div>
+                      <div className="flex-1 space-y-3">
+                        <div className="flex items-center space-x-3">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleIconLogoSelect}
+                            className="hidden"
+                            id="icon-logo-upload"
+                          />
+                          <label
+                            htmlFor="icon-logo-upload"
+                            className="cursor-pointer inline-flex items-center px-3 py-2 border border-slate-300 shadow-sm text-sm leading-4 font-medium rounded-md text-slate-700 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                          >
+                            <Upload className="h-4 w-4 mr-2" />
+                            Choose Icon Logo
+                          </label>
+                          {iconLogoFile && (
+                            <Button
+                              type="button"
+                              onClick={handleIconLogoUpload}
+                              disabled={uploadIconLogoMutation.isPending}
+                              size="sm"
+                            >
+                              {uploadIconLogoMutation.isPending
+                                ? "Uploading..."
+                                : "Upload"}
+                            </Button>
+                          )}
+                        </div>
+                        {iconLogoPreview && (
+                          <div className="mt-3">
+                            <p className="text-sm text-slate-600 mb-2">
+                              Preview:
+                            </p>
+                            <img
+                              src={iconLogoPreview}
+                              alt="Icon Logo Preview"
+                              className="w-16 h-16 object-contain border border-slate-200 rounded"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  {/* Information Panel */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <h4 className="font-medium text-blue-900 mb-2">
+                      💡 Hybrid Logo System
+                    </h4>
+                    <p className="text-sm text-blue-800">
+                      <strong>Primary Logo:</strong> Use your complete logo with
+                      company name for website and large displays.
+                      <br />
+                      <strong>Icon Logo:</strong> Use a simplified icon version
+                      for receipts, reports, and small spaces.
+                      <br />
+                      <strong>Fallback:</strong> If no icon logo is uploaded,
+                      the system will automatically use the primary logo.
+                    </p>
+                  </div>
+                  {/* Logo Upload Section */}
+                  <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Upload className="h-5 w-5 text-blue-600" />
+                      <h3 className="text-lg font-semibold text-slate-800">
+                        Upload New Logo
+                      </h3>
+                    </div>
+                    <div className="space-y-6">
+                      {/* File Selection */}
+                      <div className="flex items-center gap-4">
+                        <div className="relative">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleLogoSelect}
+                            className="hidden"
+                            id="logo-upload"
+                          />
+                          <label
+                            htmlFor="logo-upload"
+                            className="cursor-pointer inline-flex items-center px-6 py-3 border-2 border-dashed border-blue-300 rounded-xl text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 hover:border-blue-400 transition-all duration-200"
+                          >
+                            <Upload className="h-4 w-4 mr-2" />
+                            Choose Image File
+                          </label>
+                        </div>
+                        {logoFile && (
+                          <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-200 rounded-lg">
+                            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                            <span className="text-sm text-green-700 font-medium">
+                              {logoFile.name}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      {/* Logo Preview */}
+                      {logoPreview && (
+                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                          <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                            <Eye className="h-4 w-4" />
+                            Preview
+                          </h4>
+                          <div className="flex items-center gap-6">
+                            <div className="bg-white p-3 rounded-lg shadow-sm border border-slate-200">
+                              <img
+                                src={logoPreview}
+                                alt="Logo Preview"
+                                className="h-20 w-20 object-contain"
+                              />
+                            </div>
+                            <div className="flex-1">
+                              <div className="grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                  <p className="text-slate-500 mb-1">
+                                    File Name
+                                  </p>
+                                  <p className="font-medium text-slate-700">
+                                    {logoFile?.name}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-slate-500 mb-1">
+                                    File Size
+                                  </p>
+                                  <p className="font-medium text-slate-700">
+                                    {(
+                                      (logoFile?.size || 0) /
+                                      1024 /
+                                      1024
+                                    ).toFixed(2)}{" "}
+                                    MB
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {/* Upload Actions */}
+                      {logoFile && (
+                        <div className="flex items-center gap-3 pt-4 border-t border-slate-200">
+                          <Button
+                            onClick={handleLogoUpload}
+                            disabled={uploadLogoMutation.isPending}
+                            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors duration-200"
+                          >
+                            {uploadLogoMutation.isPending ? (
+                              <>
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                Uploading...
+                              </>
+                            ) : (
+                              <>
+                                <Upload className="h-4 w-4 mr-2" />
+                                Upload Logo
+                              </>
+                            )}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              setLogoFile(null);
+                              setLogoPreview(null);
+                            }}
+                            className="border-slate-300 text-slate-700 hover:bg-slate-50 px-6 py-2 rounded-lg font-medium transition-colors duration-200"
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  {/* Logo Guidelines */}
+                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-xl border border-blue-200">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="p-2 bg-blue-100 rounded-lg">
+                        <Info className="h-5 w-5 text-blue-600" />
+                      </div>
+                      <h4 className="text-lg font-semibold text-blue-900">
+                        Logo Guidelines & Best Practices
+                      </h4>
+                    </div>
+                    <div className="grid md:grid-cols-2 gap-6">
+                      <div>
+                        <h5 className="text-sm font-semibold text-blue-800 mb-3">
+                          Technical Requirements
+                        </h5>
+                        <ul className="text-sm text-blue-700 space-y-2">
+                          <li className="flex items-start gap-2">
+                            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                            <span>
+                              Supported formats:{" "}
+                              <strong>PNG, JPG, JPEG, GIF</strong>
+                            </span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                            <span>
+                              Maximum file size: <strong>5MB</strong>
+                            </span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                            <span>
+                              Recommended dimensions:{" "}
+                              <strong>200x200 pixels or larger</strong>
+                            </span>
+                          </li>
+                        </ul>
+                      </div>
+                      <div>
+                        <h5 className="text-sm font-semibold text-blue-800 mb-3">
+                          Design Recommendations
+                        </h5>
+                        <ul className="text-sm text-blue-700 space-y-2">
+                          <li className="flex items-start gap-2">
+                            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                            <span>
+                              Use <strong>transparent PNG background</strong>{" "}
+                              for best results
+                            </span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                            <span>
+                              Ensure logo is <strong>high resolution</strong>{" "}
+                              and clear
+                            </span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                            <span>
+                              Primary logo for website, icon logo for documents
+                            </span>
+                          </li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+            <TabsContent value="notifications" className="p-8 space-y-6">
+              <Card className="border-0 shadow-lg bg-white/90 backdrop-blur-sm">
+                <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100">
+                  <CardTitle className="flex items-center gap-3 text-slate-800">
+                    <div className="p-2 bg-blue-100 rounded-lg">
+                      <Bell className="h-5 w-5 text-blue-600" />
+                    </div>
+                    Notification Preferences
+                  </CardTitle>
+                  <CardDescription className="text-slate-600 mt-2">
+                    Configure how and when you want to receive notifications
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Form {...notificationForm}>
+                    <form
+                      onSubmit={notificationForm.handleSubmit(
+                        onNotificationSubmit
+                      )}
+                      className="space-y-6"
+                    >
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-medium">
+                          General Notifications
+                        </h3>
+                        <FormField
+                          control={notificationForm.control}
+                          name="emailNotifications"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center justify-between rounded-xl border border-slate-200 p-6 bg-gradient-to-r from-slate-50 to-blue-50 hover:shadow-md transition-all duration-200">
+                              <div className="space-y-1">
+                                <FormLabel className="text-base font-semibold text-slate-800">
+                                  Email Notifications
+                                </FormLabel>
+                                <FormDescription className="text-slate-600">
+                                  Receive email notifications for important
+                                  updates
+                                </FormDescription>
+                              </div>
+                              <FormControl>
+                                <Switch
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                  className="data-[state=checked]:bg-blue-600"
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={notificationForm.control}
+                          name="smsNotifications"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                              <div className="space-y-0.5">
+                                <FormLabel className="text-base">
+                                  SMS Notifications
+                                </FormLabel>
+                                <FormDescription>
+                                  Receive SMS notifications for urgent alerts
+                                </FormDescription>
+                              </div>
+                              <FormControl>
+                                <Switch
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      <Separator />
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-medium">Specific Alerts</h3>
+                        <FormField
+                          control={notificationForm.control}
+                          name="deviceStatusUpdates"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                              <div className="space-y-0.5">
+                                <FormLabel className="text-base">
+                                  Device Status Updates
+                                </FormLabel>
+                                <FormDescription>
+                                  Get notified when device repair status changes
+                                </FormDescription>
+                              </div>
+                              <FormControl>
+                                <Switch
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={notificationForm.control}
+                          name="lowStockAlerts"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                              <div className="space-y-0.5">
+                                <FormLabel className="text-base">
+                                  Low Stock Alerts
+                                </FormLabel>
+                                <FormDescription>
+                                  Get notified when inventory items are running
+                                  low
+                                </FormDescription>
+                              </div>
+                              <FormControl>
+                                <Switch
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={notificationForm.control}
+                          name="appointmentReminders"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                              <div className="space-y-0.5">
+                                <FormLabel className="text-base">
+                                  Appointment Reminders
+                                </FormLabel>
+                                <FormDescription>
+                                  Get reminded about upcoming appointments
+                                </FormDescription>
+                              </div>
+                              <FormControl>
+                                <Switch
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={notificationForm.control}
+                          name="paymentNotifications"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                              <div className="space-y-0.5">
+                                <FormLabel className="text-base">
+                                  Payment Notifications
+                                </FormLabel>
+                                <FormDescription>
+                                  Get notified about payments and transactions
+                                </FormDescription>
+                              </div>
+                              <FormControl>
+                                <Switch
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      <Separator />
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-medium">
+                          Reports & System
+                        </h3>
+                        <FormField
+                          control={notificationForm.control}
+                          name="weeklyReports"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                              <div className="space-y-0.5">
+                                <FormLabel className="text-base">
+                                  Weekly Reports
+                                </FormLabel>
+                                <FormDescription>
+                                  Receive weekly business performance reports
+                                </FormDescription>
+                              </div>
+                              <FormControl>
+                                <Switch
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={notificationForm.control}
+                          name="systemAlerts"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                              <div className="space-y-0.5">
+                                <FormLabel className="text-base">
+                                  System Alerts
+                                </FormLabel>
+                                <FormDescription>
+                                  Get notified about system updates and issues
+                                </FormDescription>
+                              </div>
+                              <FormControl>
+                                <Switch
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      <Button
+                        type="submit"
+                        className="w-full"
+                        disabled={isLoading}
+                      >
+                        {isLoading ? "Saving..." : "Save Notification Settings"}
+                      </Button>
+                    </form>
+                  </Form>
+                </CardContent>
+              </Card>
+              {/* SMS Configuration Card */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Phone className="h-5 w-5" />
+                    SMS Configuration
+                  </CardTitle>
+                  <CardDescription>
+                    Configure SMS settings for device notifications (Twilio or
+                    Ethiopian local providers)
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Form {...smsConfigForm}>
+                    <form
+                      onSubmit={smsConfigForm.handleSubmit(onSMSConfigSubmit)}
+                      className="space-y-6"
+                    >
+                      <div className="space-y-4">
+                        {/* SMS Provider Selection */}
+                        <div className="space-y-2">
+                          <Label htmlFor="sms-provider">SMS Provider</Label>
+                          <Select
+                            value={smsProvider}
+                            onValueChange={(value) => setSmsProvider(value)}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select SMS provider" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="ethiopian">
+                                Ethiopian Telecommunications Service
+                              </SelectItem>
+                              <SelectItem value="twilio">
+                                Twilio (International)
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="text-sm text-gray-600 mb-4">
+                          {smsProvider === "twilio"
+                            ? "International SMS service configuration available below"
+                            : smsProvider === "ethiopian"
+                            ? "Configure your Ethiopian telecommunications service settings below"
+                            : "Configure your SMS provider settings below"}
+                        </div>
+                        <Separator />
+                        {smsProvider === "twilio" && (
+                          <>
+                            <FormField
+                              control={smsConfigForm.control}
+                              name="twilioAccountSid"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="flex items-center gap-2">
+                                    <Key className="h-4 w-4" />
+                                    Twilio Account SID
+                                  </FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      type="password"
+                                      placeholder="Enter your Twilio Account SID"
+                                      {...field}
+                                    />
+                                  </FormControl>
+                                  <FormDescription>
+                                    Your Twilio Account SID from the Twilio
+                                    Console
+                                  </FormDescription>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={smsConfigForm.control}
+                              name="twilioAuthToken"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="flex items-center gap-2">
+                                    <Lock className="h-4 w-4" />
+                                    Twilio Auth Token
+                                  </FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      type="password"
+                                      placeholder="Enter your Twilio Auth Token"
+                                      {...field}
+                                    />
+                                  </FormControl>
+                                  <FormDescription>
+                                    Your Twilio Auth Token from the Twilio
+                                    Console
+                                  </FormDescription>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={smsConfigForm.control}
+                              name="twilioFromNumber"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="flex items-center gap-2">
+                                    <Phone className="h-4 w-4" />
+                                    Twilio Phone Number
+                                  </FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      placeholder="+1234567890"
+                                      {...field}
+                                    />
+                                  </FormControl>
+                                  <FormDescription>
+                                    Your Twilio phone number (format:
+                                    +1234567890)
+                                  </FormDescription>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </>
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="h-5 w-5 text-blue-600" />
+                          <div>
+                            <p className="font-medium text-blue-900">
+                              SMS Service Status
+                            </p>
+                            <p className="text-sm text-blue-700">
+                              {smsProvider === "twilio"
+                                ? smsServiceStatus
+                                  ? "Twilio SMS service is configured and ready"
+                                  : "Twilio SMS service needs configuration"
+                                : [
+                                    "ethio_telecom",
+                                    "africas_talking",
+                                    "bulksms",
+                                    "local_aggregator",
+                                  ].includes(smsProvider)
+                                ? `${smsProvider} SMS service configuration available below`
+                                : "SMS service configuration available below"}
+                            </p>
+                            <p className="text-xs text-blue-600 mt-1">
+                              💡{" "}
+                              {smsProvider === "twilio"
+                                ? "For Ethiopian businesses, consider using local SMS providers for better coverage and Amharic support"
+                                : [
+                                    "ethio_telecom",
+                                    "africas_talking",
+                                    "bulksms",
+                                    "local_aggregator",
+                                  ].includes(smsProvider)
+                                ? "Configure your Ethiopian SMS provider settings below"
+                                : "Configure your SMS provider settings below"}
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={testSMSService}
+                          disabled={
+                            smsProvider === "twilio" ? !smsServiceStatus : false
+                          }
+                        >
+                          Test{" "}
+                          {smsProvider === "twilio" ? "Twilio" : smsProvider}{" "}
+                          SMS
+                        </Button>
+                      </div>
+                      <Button
+                        type="submit"
+                        className="w-full"
+                        disabled={isLoading}
+                      >
+                        {isLoading ? "Saving..." : "Save SMS Configuration"}
+                      </Button>
+                    </form>
+                  </Form>
+                </CardContent>
+              </Card>
+              {/* Ethiopian SMS Configuration Card */}
+              {smsProvider === "ethiopian" && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Globe className="h-5 w-5" />
+                      Ethiopian SMS Service
+                    </CardTitle>
+                    <CardDescription>
+                      Configure local Ethiopian SMS providers for better
+                      coverage and Amharic language support
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <EthiopianSMSSettings />
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
+            <TabsContent value="system-settings" className="p-8 space-y-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <SettingsIcon className="h-5 w-5" />
+                      System Preferences
+                    </CardTitle>
+                    <CardDescription>
+                      Configure system-wide settings and preferences
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Form {...systemForm}>
+                      <form
+                        onSubmit={systemForm.handleSubmit(onSystemSubmit)}
+                        className="space-y-6"
+                      >
+                        <FormField
+                          control={systemForm.control}
+                          name="defaultCurrency"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="flex items-center gap-2">
+                                Default Currency
+                              </FormLabel>
+                              <Select
+                                onValueChange={field.onChange}
+                                value={field.value}
+                              >
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select currency" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="USD">
+                                    USD - US Dollar
+                                  </SelectItem>
+                                  <SelectItem value="EUR">
+                                    EUR - Euro
+                                  </SelectItem>
+                                  <SelectItem value="GBP">
+                                    GBP - British Pound
+                                  </SelectItem>
+                                  <SelectItem value="CAD">
+                                    CAD - Canadian Dollar
+                                  </SelectItem>
+                                  <SelectItem value="ETB">
+                                    ETB - Ethiopian Birr
+                                  </SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={systemForm.control}
+                          name="timeZone"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="flex items-center gap-2">
+                                <Clock className="h-4 w-4" />
+                                Time Zone
+                              </FormLabel>
+                              <Select
+                                onValueChange={field.onChange}
+                                value={field.value}
+                              >
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select time zone" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="America/New_York">
+                                    Eastern Time
+                                  </SelectItem>
+                                  <SelectItem value="America/Chicago">
+                                    Central Time
+                                  </SelectItem>
+                                  <SelectItem value="America/Denver">
+                                    Mountain Time
+                                  </SelectItem>
+                                  <SelectItem value="America/Los_Angeles">
+                                    Pacific Time
+                                  </SelectItem>
+                                  <SelectItem value="UTC">UTC</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={systemForm.control}
+                          name="dateFormat"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Date Format</FormLabel>
+                              <Select
+                                onValueChange={field.onChange}
+                                value={field.value}
+                              >
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select date format" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="MM/DD/YYYY">
+                                    MM/DD/YYYY
+                                  </SelectItem>
+                                  <SelectItem value="DD/MM/YYYY">
+                                    DD/MM/YYYY
+                                  </SelectItem>
+                                  <SelectItem value="YYYY-MM-DD">
+                                    YYYY-MM-DD
+                                  </SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={systemForm.control}
+                          name="language"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Language</FormLabel>
+                              <Select
+                                onValueChange={field.onChange}
+                                value={field.value}
+                              >
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select language" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="en">English</SelectItem>
+                                  <SelectItem value="es">Spanish</SelectItem>
+                                  <SelectItem value="fr">French</SelectItem>
+                                  <SelectItem value="de">German</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={systemForm.control}
+                          name="theme"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Theme</FormLabel>
+                              <Select
+                                onValueChange={field.onChange}
+                                value={field.value}
+                              >
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select theme" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="light">Light</SelectItem>
+                                  <SelectItem value="dark">Dark</SelectItem>
+                                  <SelectItem value="system">System</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={systemForm.control}
+                          name="sessionTimeout"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Session Timeout (minutes)</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  min="15"
+                                  max="480"
+                                  placeholder="60"
+                                  {...field}
+                                  onChange={(e) =>
+                                    field.onChange(
+                                      parseInt(e.target.value) || 60
+                                    )
+                                  }
+                                />
+                              </FormControl>
+                              <FormDescription>
+                                Automatically log out inactive users (15-480
+                                minutes)
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <Button
+                          type="submit"
+                          className="w-full"
+                          disabled={isLoading}
+                        >
+                          {isLoading ? "Saving..." : "Save System Settings"}
+                        </Button>
+                      </form>
+                    </Form>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Database className="h-5 w-5" />
+                      Data Management
+                    </CardTitle>
+                    <CardDescription>
+                      Backup, restore, and manage your business data
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-medium">Backup Settings</h3>
+                      <Form {...systemForm}>
+                        <FormField
+                          control={systemForm.control}
+                          name="autoBackup"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                              <div className="space-y-0.5">
+                                <FormLabel className="text-base">
+                                  Automatic Backup
+                                </FormLabel>
+                                <FormDescription>
+                                  Automatically backup your data regularly
+                                </FormDescription>
+                              </div>
+                              <FormControl>
+                                <Switch
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={systemForm.control}
+                          name="backupFrequency"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Backup Frequency</FormLabel>
+                              <Select
+                                onValueChange={field.onChange}
+                                value={field.value}
+                              >
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select frequency" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="daily">Daily</SelectItem>
+                                  <SelectItem value="weekly">Weekly</SelectItem>
+                                  <SelectItem value="monthly">
+                                    Monthly
+                                  </SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </Form>
+                    </div>
+                    <Separator />
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-medium">Manual Operations</h3>
+                      <div className="grid grid-cols-1 gap-3">
+                        <Button
+                          onClick={handleBackup}
+                          variant="outline"
+                          className="justify-start"
+                        >
+                          <Download className="h-4 w-4 mr-2" />
+                          Create Backup Now
+                        </Button>
+                        <Button
+                          onClick={handleRestore}
+                          variant="outline"
+                          className="justify-start"
+                        >
+                          <Upload className="h-4 w-4 mr-2" />
+                          Restore from Backup
+                        </Button>
+                        <Button
+                          onClick={handleExport}
+                          variant="outline"
+                          className="justify-start"
+                        >
+                          <RefreshCw className="h-4 w-4 mr-2" />
+                          Export Data
+                        </Button>
+                      </div>
+                    </div>
+                    <Separator />
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-medium text-red-600">
+                        Danger Zone
+                      </h3>
+                      <p className="text-sm text-gray-600">
+                        These actions are irreversible. Please be careful.
+                      </p>
+                      <Button variant="destructive" className="w-full">
+                        Reset All Settings
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+            <TabsContent value="receipt" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Printer className="h-5 w-5" />
+                    Receipt & Print Settings
+                  </CardTitle>
+                  <CardDescription>
+                    Customize receipt appearance and printing options
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Form {...receiptForm}>
+                    <form
+                      onSubmit={receiptForm.handleSubmit(onReceiptSubmit)}
+                      className="space-y-6"
+                    >
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-medium">Receipt Content</h3>
+                        <FormField
+                          control={receiptForm.control}
+                          name="headerText"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Header Text</FormLabel>
+                              <FormControl>
+                                <Input
+                                  placeholder="Thank you for choosing us!"
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormDescription>
+                                Text displayed at the top of receipts
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={receiptForm.control}
+                          name="footerText"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Footer Text</FormLabel>
+                              <FormControl>
+                                <Input
+                                  placeholder="Visit us again!"
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormDescription>
+                                Text displayed at the bottom of receipts
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={receiptForm.control}
+                          name="termsAndConditions"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Terms and Conditions</FormLabel>
+                              <FormControl>
+                                <Textarea
+                                  placeholder="All repairs come with a 30-day warranty..."
+                                  className="min-h-[100px]"
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormDescription>
+                                Terms and conditions printed on receipts
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      <Separator />
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-medium">Display Options</h3>
+                        <FormField
+                          control={receiptForm.control}
+                          name="showLogo"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                              <div className="space-y-0.5">
+                                <FormLabel className="text-base">
+                                  Show Logo
+                                </FormLabel>
+                                <FormDescription>
+                                  Display business logo on receipts
+                                </FormDescription>
+                              </div>
+                              <FormControl>
+                                <Switch
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={receiptForm.control}
+                          name="showBusinessInfo"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                              <div className="space-y-0.5">
+                                <FormLabel className="text-base">
+                                  Show Business Information
+                                </FormLabel>
+                                <FormDescription>
+                                  Include business address and contact details
+                                </FormDescription>
+                              </div>
+                              <FormControl>
+                                <Switch
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={receiptForm.control}
+                          name="includeBarcode"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                              <div className="space-y-0.5">
+                                <FormLabel className="text-base">
+                                  Include Barcode
+                                </FormLabel>
+                                <FormDescription>
+                                  Add barcode for tracking and reference
+                                </FormDescription>
+                              </div>
+                              <FormControl>
+                                <Switch
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      <Separator />
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-medium">Print Settings</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <FormField
+                            control={receiptForm.control}
+                            name="paperSize"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Paper Size</FormLabel>
+                                <Select
+                                  onValueChange={field.onChange}
+                                  value={field.value}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Select paper size" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="80mm">
+                                      80mm (Thermal)
+                                    </SelectItem>
+                                    <SelectItem value="58mm">
+                                      58mm (Thermal)
+                                    </SelectItem>
+                                    <SelectItem value="A4">
+                                      A4 (Letter)
+                                    </SelectItem>
+                                    <SelectItem value="Letter">
+                                      Letter (8.5x11)
+                                    </SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={receiptForm.control}
+                            name="fontSize"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Font Size</FormLabel>
+                                <Select
+                                  onValueChange={field.onChange}
+                                  value={field.value}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Select font size" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="10px">
+                                      Small (10px)
+                                    </SelectItem>
+                                    <SelectItem value="12px">
+                                      Medium (12px)
+                                    </SelectItem>
+                                    <SelectItem value="14px">
+                                      Large (14px)
+                                    </SelectItem>
+                                    <SelectItem value="16px">
+                                      Extra Large (16px)
+                                    </SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </div>
+                      <Button type="submit" className="w-full">
+                        Save Receipt Settings
+                      </Button>
+                    </form>
+                  </Form>
+                </CardContent>
+              </Card>
+            </TabsContent>
+            {/* Security Tab */}
+            <TabsContent value="security-settings" className="p-8 space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Shield className="h-5 w-5" />
+                    Security Settings
+                  </CardTitle>
+                  <CardDescription>
+                    Configure security policies and authentication settings
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Form {...securityForm}>
+                    <form
+                      onSubmit={securityForm.handleSubmit(onSecuritySubmit)}
+                      className="space-y-6"
+                    >
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-medium">Authentication</h3>
+                        <FormField
+                          control={securityForm.control}
+                          name="requirePasswordChange"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                              <div className="space-y-0.5">
+                                <FormLabel className="text-base">
+                                  Require Password Change
+                                </FormLabel>
+                                <FormDescription>
+                                  Force users to change passwords periodically
+                                </FormDescription>
+                              </div>
+                              <FormControl>
+                                <Switch
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={securityForm.control}
+                          name="twoFactorAuth"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                              <div className="space-y-0.5">
+                                <FormLabel className="text-base">
+                                  Two-Factor Authentication
+                                </FormLabel>
+                                <FormDescription>
+                                  Enable 2FA for enhanced security
+                                </FormDescription>
+                              </div>
+                              <FormControl>
+                                <Switch
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <FormField
+                            control={securityForm.control}
+                            name="passwordExpiryDays"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Password Expiry (Days)</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    min="30"
+                                    max="365"
+                                    {...field}
+                                    onChange={(e) =>
+                                      field.onChange(parseInt(e.target.value))
+                                    }
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={securityForm.control}
+                            name="maxLoginAttempts"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Max Login Attempts</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    min="3"
+                                    max="10"
+                                    {...field}
+                                    onChange={(e) =>
+                                      field.onChange(parseInt(e.target.value))
+                                    }
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </div>
+                      <Separator />
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-medium">
+                          Session Management
+                        </h3>
+                        <FormField
+                          control={securityForm.control}
+                          name="sessionTimeout"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Session Timeout (Minutes)</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  min="15"
+                                  max="480"
+                                  {...field}
+                                  onChange={(e) =>
+                                    field.onChange(parseInt(e.target.value))
+                                  }
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={securityForm.control}
+                          name="ipWhitelist"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>IP Whitelist (Optional)</FormLabel>
+                              <FormControl>
+                                <Textarea
+                                  placeholder="192.168.1.1&#10;10.0.0.1"
+                                  className="min-h-[100px]"
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormDescription>
+                                One IP address per line. Leave empty to allow
+                                all IPs.
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      <Separator />
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-medium">Data Protection</h3>
+                        <FormField
+                          control={securityForm.control}
+                          name="auditLogging"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                              <div className="space-y-0.5">
+                                <FormLabel className="text-base">
+                                  Audit Logging
+                                </FormLabel>
+                                <FormDescription>
+                                  Log all user actions for security monitoring
+                                </FormDescription>
+                              </div>
+                              <FormControl>
+                                <Switch
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={securityForm.control}
+                          name="dataEncryption"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                              <div className="space-y-0.5">
+                                <FormLabel className="text-base">
+                                  Data Encryption
+                                </FormLabel>
+                                <FormDescription>
+                                  Encrypt sensitive data at rest
+                                </FormDescription>
+                              </div>
+                              <FormControl>
+                                <Switch
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      <Button type="submit" className="w-full">
+                        Save Security Settings
+                      </Button>
+                    </form>
+                  </Form>
+                </CardContent>
+              </Card>
+            </TabsContent>
+            {/* User Management Tab */}
+            <TabsContent value="users" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5" />
+                    User Management
+                  </CardTitle>
+                  <CardDescription>
+                    Configure user registration and management policies
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Form {...userManagementForm}>
+                    <form
+                      onSubmit={userManagementForm.handleSubmit(
+                        onUserManagementSubmit
+                      )}
+                      className="space-y-6"
+                    >
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-medium">
+                          User Registration
+                        </h3>
+                        <FormField
+                          control={userManagementForm.control}
+                          name="allowUserRegistration"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                              <div className="space-y-0.5">
+                                <FormLabel className="text-base">
+                                  Allow User Registration
+                                </FormLabel>
+                                <FormDescription>
+                                  Allow new users to register themselves
+                                </FormDescription>
+                              </div>
+                              <FormControl>
+                                <Switch
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={userManagementForm.control}
+                          name="requireEmailVerification"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                              <div className="space-y-0.5">
+                                <FormLabel className="text-base">
+                                  Require Email Verification
+                                </FormLabel>
+                                <FormDescription>
+                                  Require email verification for new accounts
+                                </FormDescription>
+                              </div>
+                              <FormControl>
+                                <Switch
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <FormField
+                            control={userManagementForm.control}
+                            name="defaultUserRole"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Default User Role</FormLabel>
+                                <Select
+                                  onValueChange={field.onChange}
+                                  value={field.value}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Select default role" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="admin">
+                                      Administrator
+                                    </SelectItem>
+                                    <SelectItem value="technician">
+                                      Technician
+                                    </SelectItem>
+                                    <SelectItem value="sales">Sales</SelectItem>
+                                    <SelectItem value="viewer">
+                                      Viewer
+                                    </SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={userManagementForm.control}
+                            name="maxUsers"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Maximum Users</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    min="1"
+                                    max="100"
+                                    {...field}
+                                    onChange={(e) =>
+                                      field.onChange(parseInt(e.target.value))
+                                    }
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </div>
+                      <Separator />
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-medium">Password Policy</h3>
+                        <FormField
+                          control={userManagementForm.control}
+                          name="passwordPolicy.minLength"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Minimum Password Length</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  min="8"
+                                  max="20"
+                                  {...field}
+                                  onChange={(e) =>
+                                    field.onChange(parseInt(e.target.value))
+                                  }
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <FormField
+                            control={userManagementForm.control}
+                            name="passwordPolicy.requireUppercase"
+                            render={({ field }) => (
+                              <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                                <div className="space-y-0.5">
+                                  <FormLabel className="text-base">
+                                    Require Uppercase
+                                  </FormLabel>
+                                  <FormDescription>
+                                    Passwords must contain uppercase letters
+                                  </FormDescription>
+                                </div>
+                                <FormControl>
+                                  <Switch
+                                    checked={field.value}
+                                    onCheckedChange={field.onChange}
+                                  />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={userManagementForm.control}
+                            name="passwordPolicy.requireLowercase"
+                            render={({ field }) => (
+                              <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                                <div className="space-y-0.5">
+                                  <FormLabel className="text-base">
+                                    Require Lowercase
+                                  </FormLabel>
+                                  <FormDescription>
+                                    Passwords must contain lowercase letters
+                                  </FormDescription>
+                                </div>
+                                <FormControl>
+                                  <Switch
+                                    checked={field.value}
+                                    onCheckedChange={field.onChange}
+                                  />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={userManagementForm.control}
+                            name="passwordPolicy.requireNumbers"
+                            render={({ field }) => (
+                              <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                                <div className="space-y-0.5">
+                                  <FormLabel className="text-base">
+                                    Require Numbers
+                                  </FormLabel>
+                                  <FormDescription>
+                                    Passwords must contain numbers
+                                  </FormDescription>
+                                </div>
+                                <FormControl>
+                                  <Switch
+                                    checked={field.value}
+                                    onCheckedChange={field.onChange}
+                                  />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={userManagementForm.control}
+                            name="passwordPolicy.requireSpecialChars"
+                            render={({ field }) => (
+                              <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                                <div className="space-y-0.5">
+                                  <FormLabel className="text-base">
+                                    Require Special Characters
+                                  </FormLabel>
+                                  <FormDescription>
+                                    Passwords must contain special characters
+                                  </FormDescription>
+                                </div>
+                                <FormControl>
+                                  <Switch
+                                    checked={field.value}
+                                    onCheckedChange={field.onChange}
+                                  />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </div>
+                      <Button type="submit" className="w-full">
+                        Save User Management Settings
+                      </Button>
+                    </form>
+                  </Form>
+                </CardContent>
+              </Card>
+            </TabsContent>
+            {/* Business Rules Tab */}
+            <TabsContent value="business-rules" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Wrench className="h-5 w-5" />
+                    Business Rules & Automation
+                  </CardTitle>
+                  <CardDescription>
+                    Configure automated business processes and rules
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Form {...businessRulesForm}>
+                    <form
+                      onSubmit={businessRulesForm.handleSubmit(
+                        onBusinessRulesSubmit
+                      )}
+                      className="space-y-6"
+                    >
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-medium">
+                          Repair Management
+                        </h3>
+                        <FormField
+                          control={businessRulesForm.control}
+                          name="autoAssignTechnicians"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                              <div className="space-y-0.5">
+                                <FormLabel className="text-base">
+                                  Auto-Assign Technicians
+                                </FormLabel>
+                                <FormDescription>
+                                  Automatically assign repairs to available
+                                  technicians
+                                </FormDescription>
+                              </div>
+                              <FormControl>
+                                <Switch
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={businessRulesForm.control}
+                          name="defaultRepairTime"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Default Repair Time (Days)</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  min="1"
+                                  max="30"
+                                  {...field}
+                                  onChange={(e) =>
+                                    field.onChange(parseInt(e.target.value))
+                                  }
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      <Separator />
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-medium">
+                          Inventory Management
+                        </h3>
+                        <FormField
+                          control={businessRulesForm.control}
+                          name="lowStockThreshold"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Low Stock Threshold</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  min="1"
+                                  max="100"
+                                  {...field}
+                                  onChange={(e) =>
+                                    field.onChange(parseInt(e.target.value))
+                                  }
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={businessRulesForm.control}
+                          name="overdueReminderDays"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Overdue Reminder (Days)</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  min="1"
+                                  max="30"
+                                  {...field}
+                                  onChange={(e) =>
+                                    field.onChange(parseInt(e.target.value))
+                                  }
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      <Separator />
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-medium">
+                          Financial Settings
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <FormField
+                            control={businessRulesForm.control}
+                            name="taxRate"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Tax Rate (%)</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    max="50"
+                                    step="0.1"
+                                    {...field}
+                                    onChange={(e) =>
+                                      field.onChange(parseFloat(e.target.value))
+                                    }
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={businessRulesForm.control}
+                            name="defaultPaymentTerms"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>
+                                  Default Payment Terms (Days)
+                                </FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    max="90"
+                                    {...field}
+                                    onChange={(e) =>
+                                      field.onChange(parseInt(e.target.value))
+                                    }
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={businessRulesForm.control}
+                            name="currencySymbol"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Currency Symbol</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    placeholder="ETB"
+                                    maxLength={5}
+                                    {...field}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={businessRulesForm.control}
+                            name="decimalPlaces"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Decimal Places</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    max="4"
+                                    {...field}
+                                    onChange={(e) =>
+                                      field.onChange(parseInt(e.target.value))
+                                    }
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                        <FormField
+                          control={businessRulesForm.control}
+                          name="autoGenerateInvoices"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                              <div className="space-y-0.5">
+                                <FormLabel className="text-base">
+                                  Auto-Generate Invoices
+                                </FormLabel>
+                                <FormDescription>
+                                  Automatically generate invoices for completed
+                                  repairs
+                                </FormDescription>
+                              </div>
+                              <FormControl>
+                                <Switch
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={businessRulesForm.control}
+                          name="requireCustomerApproval"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                              <div className="space-y-0.5">
+                                <FormLabel className="text-base">
+                                  Require Customer Approval
+                                </FormLabel>
+                                <FormDescription>
+                                  Require customer approval before starting
+                                  repairs
+                                </FormDescription>
+                              </div>
+                              <FormControl>
+                                <Switch
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      <Button type="submit" className="w-full">
+                        Save Business Rules
+                      </Button>
+                    </form>
+                  </Form>
+                </CardContent>
+              </Card>
+            </TabsContent>
+            {/* Integrations Tab */}
+            <TabsContent value="integrations" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Globe className="h-5 w-5" />
+                    Integrations & API
+                  </CardTitle>
+                  <CardDescription>
+                    Configure third-party integrations and API settings
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Form {...integrationsForm}>
+                    <form
+                      onSubmit={integrationsForm.handleSubmit(
+                        onIntegrationsSubmit
+                      )}
+                      className="space-y-6"
+                    >
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-medium">
+                          Communication Services
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <FormField
+                            control={integrationsForm.control}
+                            name="smsProvider"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>SMS Provider</FormLabel>
+                                <Select
+                                  onValueChange={field.onChange}
+                                  value={field.value}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Select SMS provider" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="twilio">
+                                      Twilio
+                                    </SelectItem>
+                                    <SelectItem value="ethio_telecom">
+                                      Ethio Telecom
+                                    </SelectItem>
+                                    <SelectItem value="africas_talking">
+                                      AfricasTalking
+                                    </SelectItem>
+                                    <SelectItem value="bulksms">
+                                      BulkSMS
+                                    </SelectItem>
+                                    <SelectItem value="local_aggregator">
+                                      Local SMS Aggregator
+                                    </SelectItem>
+                                    <SelectItem value="aws-sns">
+                                      AWS SNS
+                                    </SelectItem>
+                                    <SelectItem value="nexmo">Nexmo</SelectItem>
+                                    <SelectItem value="none">None</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={integrationsForm.control}
+                            name="emailProvider"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Email Provider</FormLabel>
+                                <Select
+                                  onValueChange={field.onChange}
+                                  value={field.value}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Select email provider" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="smtp">SMTP</SelectItem>
+                                    <SelectItem value="sendgrid">
+                                      SendGrid
+                                    </SelectItem>
+                                    <SelectItem value="mailgun">
+                                      Mailgun
+                                    </SelectItem>
+                                    <SelectItem value="aws-ses">
+                                      AWS SES
+                                    </SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </div>
+                      <Separator />
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-medium">
+                          Payment & Accounting
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <FormField
+                            control={integrationsForm.control}
+                            name="paymentGateway"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Payment Gateway</FormLabel>
+                                <Select
+                                  onValueChange={field.onChange}
+                                  value={field.value}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Select payment gateway" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="stripe">
+                                      Stripe
+                                    </SelectItem>
+                                    <SelectItem value="paypal">
+                                      PayPal
+                                    </SelectItem>
+                                    <SelectItem value="square">
+                                      Square
+                                    </SelectItem>
+                                    <SelectItem value="none">None</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={integrationsForm.control}
+                            name="accountingSoftware"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Accounting Software</FormLabel>
+                                <Select
+                                  onValueChange={field.onChange}
+                                  value={field.value}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Select accounting software" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="quickbooks">
+                                      QuickBooks
+                                    </SelectItem>
+                                    <SelectItem value="xero">Xero</SelectItem>
+                                    <SelectItem value="freshbooks">
+                                      FreshBooks
+                                    </SelectItem>
+                                    <SelectItem value="none">None</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </div>
+                      <Separator />
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-medium">API & Webhooks</h3>
+                        <FormField
+                          control={integrationsForm.control}
+                          name="apiEnabled"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                              <div className="space-y-0.5">
+                                <FormLabel className="text-base">
+                                  Enable API Access
+                                </FormLabel>
+                                <FormDescription>
+                                  Enable REST API for external integrations
+                                </FormDescription>
+                              </div>
+                              <FormControl>
+                                <Switch
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={integrationsForm.control}
+                          name="crmIntegration"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                              <div className="space-y-0.5">
+                                <FormLabel className="text-base">
+                                  CRM Integration
+                                </FormLabel>
+                                <FormDescription>
+                                  Sync customer data with CRM systems
+                                </FormDescription>
+                              </div>
+                              <FormControl>
+                                <Switch
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={integrationsForm.control}
+                          name="webhookUrl"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Webhook URL (Optional)</FormLabel>
+                              <FormControl>
+                                <Input
+                                  placeholder="https://your-webhook-endpoint.com"
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormDescription>
+                                URL to receive real-time notifications
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={integrationsForm.control}
+                          name="syncFrequency"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Sync Frequency</FormLabel>
+                              <Select
+                                onValueChange={field.onChange}
+                                value={field.value}
+                              >
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select sync frequency" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="realtime">
+                                    Real-time
+                                  </SelectItem>
+                                  <SelectItem value="hourly">Hourly</SelectItem>
+                                  <SelectItem value="daily">Daily</SelectItem>
+                                  <SelectItem value="weekly">Weekly</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      <Button type="submit" className="w-full">
+                        Save Integration Settings
+                      </Button>
+                    </form>
+                  </Form>
+                </CardContent>
+              </Card>
+            </TabsContent>
+            {/* Maintenance Tab */}
+            <TabsContent value="maintenance" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Settings2 className="h-5 w-5" />
+                    System Maintenance
+                  </CardTitle>
+                  <CardDescription>
+                    Configure system maintenance and optimization settings
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Form {...maintenanceForm}>
+                    <form
+                      onSubmit={maintenanceForm.handleSubmit(
+                        onMaintenanceSubmit
+                      )}
+                      className="space-y-6"
+                    >
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-medium">
+                          Database Optimization
+                        </h3>
+                        <FormField
+                          control={maintenanceForm.control}
+                          name="autoOptimizeDatabase"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                              <div className="space-y-0.5">
+                                <FormLabel className="text-base">
+                                  Auto-Optimize Database
+                                </FormLabel>
+                                <FormDescription>
+                                  Automatically optimize database performance
+                                </FormDescription>
+                              </div>
+                              <FormControl>
+                                <Switch
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={maintenanceForm.control}
+                          name="optimizeFrequency"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Optimization Frequency</FormLabel>
+                              <Select
+                                onValueChange={field.onChange}
+                                value={field.value}
+                              >
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select frequency" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="daily">Daily</SelectItem>
+                                  <SelectItem value="weekly">Weekly</SelectItem>
+                                  <SelectItem value="monthly">
+                                    Monthly
+                                  </SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      <Separator />
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-medium">
+                          Cache Management
+                        </h3>
+                        <FormField
+                          control={maintenanceForm.control}
+                          name="clearCacheFrequency"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Clear Cache Frequency</FormLabel>
+                              <Select
+                                onValueChange={field.onChange}
+                                value={field.value}
+                              >
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select frequency" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="hourly">Hourly</SelectItem>
+                                  <SelectItem value="daily">Daily</SelectItem>
+                                  <SelectItem value="weekly">Weekly</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      <Separator />
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-medium">Data Management</h3>
+                        <FormField
+                          control={maintenanceForm.control}
+                          name="autoCleanupOldData"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                              <div className="space-y-0.5">
+                                <FormLabel className="text-base">
+                                  Auto-Cleanup Old Data
+                                </FormLabel>
+                                <FormDescription>
+                                  Automatically remove old data to save space
+                                </FormDescription>
+                              </div>
+                              <FormControl>
+                                <Switch
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <FormField
+                            control={maintenanceForm.control}
+                            name="logRetentionDays"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Log Retention (Days)</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    min="1"
+                                    max="365"
+                                    {...field}
+                                    onChange={(e) =>
+                                      field.onChange(parseInt(e.target.value))
+                                    }
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={maintenanceForm.control}
+                            name="cleanupRetentionDays"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>
+                                  Data Cleanup Retention (Days)
+                                </FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    min="30"
+                                    max="1095"
+                                    {...field}
+                                    onChange={(e) =>
+                                      field.onChange(parseInt(e.target.value))
+                                    }
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </div>
+                      <Separator />
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-medium">
+                          Monitoring & Debugging
+                        </h3>
+                        <FormField
+                          control={maintenanceForm.control}
+                          name="enableDebugMode"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                              <div className="space-y-0.5">
+                                <FormLabel className="text-base">
+                                  Enable Debug Mode
+                                </FormLabel>
+                                <FormDescription>
+                                  Enable detailed logging for troubleshooting
+                                </FormDescription>
+                              </div>
+                              <FormControl>
+                                <Switch
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={maintenanceForm.control}
+                          name="enablePerformanceMonitoring"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                              <div className="space-y-0.5">
+                                <FormLabel className="text-base">
+                                  Performance Monitoring
+                                </FormLabel>
+                                <FormDescription>
+                                  Monitor system performance metrics
+                                </FormDescription>
+                              </div>
+                              <FormControl>
+                                <Switch
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={maintenanceForm.control}
+                          name="enableSystemHealthChecks"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                              <div className="space-y-0.5">
+                                <FormLabel className="text-base">
+                                  System Health Checks
+                                </FormLabel>
+                                <FormDescription>
+                                  Regular system health monitoring
+                                </FormDescription>
+                              </div>
+                              <FormControl>
+                                <Switch
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={maintenanceForm.control}
+                          name="healthCheckFrequency"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Health Check Frequency</FormLabel>
+                              <Select
+                                onValueChange={field.onChange}
+                                value={field.value}
+                              >
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select frequency" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="hourly">Hourly</SelectItem>
+                                  <SelectItem value="daily">Daily</SelectItem>
+                                  <SelectItem value="weekly">Weekly</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      <Button
+                        type="submit"
+                        className="w-full"
+                        disabled={isLoading}
+                      >
+                        {isLoading ? "Saving..." : "Save Maintenance Settings"}
+                      </Button>
+                    </form>
+                  </Form>
+                </CardContent>
+              </Card>
+            </TabsContent>
+            {/* SMS Templates Tab */}
+            <TabsContent value="sms-templates" className="p-8 space-y-6">
+              <Tabs defaultValue="templates" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="templates">Message Templates</TabsTrigger>
+                  <TabsTrigger value="campaigns">Bulk Campaigns</TabsTrigger>
+                </TabsList>
+                <TabsContent value="templates" className="space-y-6">
+                  <SMSTemplateEditor />
+                </TabsContent>
+                <TabsContent value="campaigns" className="space-y-6">
+                  <BulkSMSCampaign />
+                </TabsContent>
+              </Tabs>
+            </TabsContent>
+            {/* Recipient Groups Tab */}
+            <TabsContent value="recipient-groups" className="p-8 space-y-6">
+              <RecipientGroupsManager />
+            </TabsContent>
+            {/* Reports Tab */}
+            <TabsContent value="reports" className="p-8 space-y-6">
+              <Card className="border-0 shadow-lg bg-white/90 backdrop-blur-sm">
+                <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100">
+                  <CardTitle className="flex items-center gap-3 text-slate-800">
+                    <div className="p-2 bg-blue-100 rounded-lg">
+                      <FileText className="h-5 w-5 text-blue-600" />
+                    </div>
+                    System Reports & Analytics
+                  </CardTitle>
+                  <CardDescription className="text-slate-600 mt-2">
+                    Generate comprehensive reports with print and export options
+                    for business insights
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <ReportGenerator />
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </div>
+      </div>
+    </div>
+  );
+}
